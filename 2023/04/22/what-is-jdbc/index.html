@@ -1,0 +1,93 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author"><title>关于JDBC · Minho hooooo.</title><meta name="description" content="简单了解JDBCJDBC，应该叫J DB C，因为全称Java Database Connectivity（Java连接数据库），是Java语言中用于规范客户端程序如何访问数据库的应用程序接口，提供操作数据库中数据的方法。JDBC是面向关系型数据库的。（源自Wiki）
+也就是说JDBC是Java提供"><meta name="keywords"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">Minho hooooo.</a></h3></div></div><ul class="social-links"></ul><div class="footer"><a target="_blank" href="/"><span>Theme by </span></a><a target="_blank" rel="noopener" href="https://www.caicai.me"> CaiCai </a><span>&</span><a target="_blank" rel="noopener" href="https://github.com/Ben02/hexo-theme-Anatole"> Ben</a><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">Home</a></li><li><a href="/about">Sobre</a></li><li><a href="/archives">Arquivo</a></li><li><a href="/links">Links</a></li></div><div class="information"><div class="back_btn"><li><a class="fa fa-chevron-left" onclick="window.history.go(-1)"> </a></li></div><div class="avatar"><img></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>关于JDBC</a></h3></div><div class="post-content"><h4 id="简单了解JDBC"><a href="#简单了解JDBC" class="headerlink" title="简单了解JDBC"></a>简单了解JDBC</h4><p>JDBC，应该叫J DB C，因为全称Java Database Connectivity（Java连接数据库），是Java语言中用于规范客户端程序如何访问数据库的应用程序接口，提供操作数据库中数据的方法。JDBC是面向关系型数据库的。（源自Wiki）</p>
+<p>也就是说JDBC是Java提供的一种接口（在<code>java.sql</code>和<code>javax.sql</code>包中），由各数据库厂商来提供实现了接口的驱动。这样只需要使用JDBC规范的接口方法即可操作所有有对应驱动的数据库软件，即使更换数据库软件也不会造成很大的影响。</p>
+<h4 id="JDBC核心类与接口"><a href="#JDBC核心类与接口" class="headerlink" title="JDBC核心类与接口"></a>JDBC核心类与接口</h4><p><code>DriverManager</code></p>
+<blockquote>
+<ol>
+<li>将第三方数据库厂商的驱动注册到应用程序中</li>
+<li>通过数据库连接信息获取数据库连接对象(Connection)</li>
+</ol>
+</blockquote>
+<p><code>Connection</code></p>
+<blockquote>
+<ol>
+<li>和数据库的连接类，生成的实例即为连接对象，可以执行CRUD</li>
+<li>可以获取Statement、PreparedStatement、CallableStatement对象</li>
+</ol>
+</blockquote>
+<p><code>Statement</code> <code>PreparedStatement</code> <code>CallableStatement</code></p>
+<blockquote>
+<ol>
+<li>发送SQL语句到DBMS的对象</li>
+<li>三种接口适用场合以及功能不同</li>
+</ol>
+</blockquote>
+<p><code>Result</code></p>
+<blockquote>
+<ol>
+<li>数据库查询（DQL）结果集抽象成的对象、</li>
+<li>需要解析才能得到具体的数据库对象</li>
+</ol>
+</blockquote>
+<h4 id="三种查询接口"><a href="#三种查询接口" class="headerlink" title="三种查询接口"></a>三种查询接口</h4><p>Statement、PreparedStatement、CallableStatement都是用于SQL查询的接口（Interface）。</p>
+<p><code>Statement</code></p>
+<p>继承自Wrapper，静态SQL语句对象，用于执行不带参数的简单语句，并返回生成的结果，每次执行都需要重新编译。</p>
+<p>存在问题：</p>
+<blockquote>
+<ol>
+<li>SQL语句需要字符串拼接，只能拼接字符串类型</li>
+<li>可能发生注入攻击</li>
+</ol>
+</blockquote>
+<p>常用方法：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 返回是否检索到结果集，一般在数据库/表创建时使用</span></span><br><span class="line"><span class="type">boolean</span> <span class="title function_">execute</span><span class="params">(String sql)</span>;</span><br><span class="line"><span class="comment">// 返回SQL语句影响的行数，一般在数据库查询时使用</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">executeUpdate</span><span class="params">(String sql)</span>;</span><br><span class="line"><span class="comment">// 返回结果集，一般在数据的插入、删除、修改时使用</span></span><br><span class="line">ResultSet <span class="title function_">executeQuery</span><span class="params">(String sql)</span>;</span><br></pre></td></tr></table></figure>
+
+<p><code>PreparedStatement</code></p>
+<p>继承自Statement，预编译SQL语句对象，用于执行带参数&#x2F;不带参数的预编译语句，一次编译可多次执行，能够有效防止<strong>SQL注入攻击</strong>。</p>
+<p><code>CallalbeStatement</code></p>
+<p>继承自PreparedStatement，执行标准存储过程语句的对象，提供对输入输出参数的支持，但不同数据库存储过程不可移植，因此CallableStatement移植性较差。</p>
+<h4 id="JDBC使用标准流程"><a href="#JDBC使用标准流程" class="headerlink" title="JDBC使用标准流程"></a>JDBC使用标准流程</h4><ol>
+<li>注册驱动</li>
+</ol>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 以MySQL驱动为例</span></span><br><span class="line">Class.forName(<span class="string">&quot;com.mysql.cj.jdbc.Driver&quot;</span>);</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>获取连接</li>
+</ol>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">url</span> <span class="operator">=</span> <span class="string">&quot;jdbc:mysql://host:port/dbname?userSSL=false&quot;</span>;</span><br><span class="line"><span class="type">String</span> <span class="variable">user</span> <span class="operator">=</span> <span class="string">&quot;user&quot;</span>;</span><br><span class="line"><span class="type">String</span> <span class="variable">password</span> <span class="operator">=</span> <span class="string">&quot;password&quot;</span>;</span><br><span class="line"><span class="type">Connection</span> <span class="variable">connection</span> <span class="operator">=</span> DriverManager.getConnection(url, user, password);</span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>创建要发送的SQL语句对象并传入语句结构</li>
+</ol>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 使用PreparedStatement接口</span></span><br><span class="line"><span class="type">String</span> <span class="variable">sql</span> <span class="operator">=</span> <span class="string">&quot;SELECT * FROM db_table WHERE name=?;&quot;</span>;</span><br><span class="line"><span class="type">PreparedStatement</span> <span class="variable">preparedStatement</span> <span class="operator">=</span> connection.createStatement(sql);</span><br></pre></td></tr></table></figure>
+
+<ol start="4">
+<li>占位符赋值</li>
+</ol>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">preparedStatement.setString(<span class="number">1</span>, <span class="string">&quot;test&quot;</span>);</span><br></pre></td></tr></table></figure>
+
+<ol start="5">
+<li>发送SQL语句并获取结果</li>
+</ol>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">ResultSet</span> <span class="variable">resultSet</span> <span class="operator">=</span> preparedStatement.executeQuery(sql);</span><br></pre></td></tr></table></figure>
+
+<ol start="6">
+<li>对结果集进行解析</li>
+</ol>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">while</span> (resultSet.next()) &#123;</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol start="7">
+<li>关闭资源</li>
+</ol>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">preparedStatement.close();</span><br><span class="line">connection.close();</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="PreparedStatement-防止SQL注入原理"><a href="#PreparedStatement-防止SQL注入原理" class="headerlink" title="PreparedStatement 防止SQL注入原理"></a>PreparedStatement 防止SQL注入原理</h4><p>模拟SQL注入：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">JdbcTest</span> &#123;</span><br><span class="line">	<span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        login(<span class="string">&quot;Acx7 or &#x27;1=1&#x27;&quot;</span>, <span class="string">&quot;1234 or &#x27;1=1&#x27;&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">login</span><span class="params">(String username, String password)</span> &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="type">Connection</span> <span class="variable">conn</span> <span class="operator">=</span> JdbcUtils.getConnection();</span><br><span class="line">            <span class="type">String</span> <span class="variable">sql</span> <span class="operator">=</span> <span class="string">&quot;SELECT * FROM users WHERE `name`=? and password=?&quot;</span>;</span><br><span class="line">            <span class="type">PreparedStatement</span> <span class="variable">ps</span> <span class="operator">=</span> conn.preparedStatement(sql);</span><br><span class="line">            ps.setString(<span class="number">1</span>, username);</span><br><span class="line">            ps.setString(<span class="number">2</span>, password);</span><br><span class="line">            <span class="type">ResultSet</span> <span class="variable">rs</span> <span class="operator">=</span> ps.executeQuery();</span><br><span class="line">            </span><br><span class="line">            System.out.println(ps.toString()); <span class="comment">// 输出最终执行的SQL语句</span></span><br><span class="line">            whiel (rs.next()) &#123;</span><br><span class="line">                System.out.println(rs.getObject(<span class="string">&quot;name&quot;</span>));</span><br><span class="line">                System.out.println(rs.getObject(<span class="string">&quot;password&quot;</span>));</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">            <span class="keyword">throw</span> e;</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            rs.close();</span><br><span class="line">            ps.close();</span><br><span class="line">            conn.close();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>输出结果：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="operator">*</span> <span class="keyword">FROM</span> users <span class="keyword">WHERE</span> `name`<span class="operator">=</span><span class="string">&#x27;Acx7 or \&#x27;</span><span class="number">1</span><span class="operator">=</span><span class="number">1</span>\<span class="string">&#x27;&#x27;</span> <span class="keyword">and</span> password<span class="operator">=</span><span class="string">&#x27;1234 \&#x27;</span><span class="number">1</span><span class="operator">=</span><span class="number">1</span>\<span class="string">&#x27;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>可以看出PreparedStatement防止SQL注入的原理就是将用户输入的单引号进行转移，最终传入参数作为一个整体执行，以防止注入攻击，而Statement不会进行转义操作，<strong>应该始终以PreparedStatement代替Statement</strong>。</p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2023-04-22</span><i class="fa fa-tag"></i></div></div></div></div><div class="share"><div class="evernote"><a class="fa fa-bookmark" href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank"></a></div><div class="weibo"><a class="fa fa-weibo" href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));"></a></div><div class="twitter"><a class="fa fa-twitter" target="_blank" rel="noopener" href="http://twitter.com/home?status=,http://example.com/2023/04/22/what-is-jdbc/,Minho hooooo.,关于JDBC,;"></a></div></div><div class="pagination"><ul class="clearfix"><li class="next pagbuttons"><a class="btn" role="navigation" href="/2023/04/21/what-is-aop/" title="什么是面向切面编程(AOP)">Próximo post</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>
