@@ -1,0 +1,76 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author"><title>关于分布式以及MapReduce · Minho hooooo.</title><meta name="description" content="1.1 分布式驱动与挑战分布式系统的核心是通过网络来协调，共同完成一致人物的一些计算机。
+如果能用一台计算机解决的问题，就不要用分布式系统，不然会让问题变得复杂。
+使用分布式系统的驱动力：
+
+需要更高的性能
+获得容错的能力，一个故障了，另一个可以运行
+有的问题天然是分布式的，比如两地银行转账
+需要分"><meta name="keywords"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">Minho hooooo.</a></h3></div></div><ul class="social-links"></ul><div class="footer"><a target="_blank" href="/"><span>Theme by </span></a><a target="_blank" rel="noopener" href="https://www.caicai.me"> CaiCai </a><span>&</span><a target="_blank" rel="noopener" href="https://github.com/Ben02/hexo-theme-Anatole"> Ben</a><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/links">友链</a></li></div><div class="information"><div class="back_btn"><li><a class="fa fa-chevron-left" onclick="window.history.go(-1)"> </a></li></div><div class="avatar"><img></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>关于分布式以及MapReduce</a></h3></div><div class="post-content"><h3 id="1-1-分布式驱动与挑战"><a href="#1-1-分布式驱动与挑战" class="headerlink" title="1.1 分布式驱动与挑战"></a>1.1 分布式驱动与挑战</h3><p>分布式系统的核心是通过网络来协调，共同完成一致人物的一些计算机。</p>
+<p>如果能用一台计算机解决的问题，就不要用分布式系统，不然会让问题变得复杂。</p>
+<p>使用分布式系统的驱动力：</p>
+<ol>
+<li>需要更高的性能</li>
+<li>获得容错的能力，一个故障了，另一个可以运行</li>
+<li>有的问题天然是分布式的，比如两地银行转账</li>
+<li>需要分布式达成一个安全的目标</li>
+</ol>
+<p>使用分布式的挑战：</p>
+<ol>
+<li>有的任务需要并发执行，会出现各种问题，比如时间依赖（同步，异步）</li>
+<li>分布式系统组成部分很多，还包括计算机网络，计算机要么故障要么运行，计算机网络可能稳定可能不稳定。</li>
+<li>分布式系统到底能带来多少性能上的提升</li>
+</ol>
+<h3 id="1-2-分布式系统抽象和实现"><a href="#1-2-分布式系统抽象和实现" class="headerlink" title="1.2 分布式系统抽象和实现"></a>1.2 分布式系统抽象和实现</h3><p>基础架构：存储，网络通信，计算。</p>
+<ol>
+<li>存储很有用，现在已经可以构建出一个多副本，容错，高性能的分布式存储实现</li>
+<li>网络通信是建立分布式系统的工具，需要保证可靠性</li>
+<li>对于存储和计算，需要设计一些简单的接口，让整个分布式系统看起来就像一个系统或者大家都能理解的一个简单的系统一样，但又可以提供极高的性能和容错性</li>
+</ol>
+<p>实现工具：</p>
+<ol>
+<li>RPC，用来掩盖在不可靠网络上通信的事实</li>
+<li>线程技术，提供结构化的并发方法</li>
+<li>锁，用来实现并发控制</li>
+</ol>
+<h3 id="1-3-可拓展性"><a href="#1-3-可拓展性" class="headerlink" title="1.3 可拓展性"></a>1.3 可拓展性</h3><p>如果一个计算机可以解决问题，买两个就能用原来一般的实践解决问题，两台计算机构成的系统可以提供两倍性能或者吞吐，就是可拓展性。</p>
+<p>如果构建的一个系统，只需要通过增加计算机数量救恩那个带来显著的性能提升是极好的，这比花钱雇佣程序员重构系统划算得多。</p>
+<p>比如一个web服务器，在一台计算机上运行，如果突然有数亿倍的用户，一台计算机很难支撑，这时候增加计算机的数量，分流给不同服务器，共享一个数据库，就能带来性能提高。这时候瓶颈会慢慢给到数据库，但是增加数据库服务器的数量，重构拆分数据库很麻烦。</p>
+<p>所以我们虽然希望只通过增加计算机的数量就能提高性能，但实际上很难实现，需要更好的架构设计来实现可拓展性的推进。</p>
+<h3 id="1-3-可用性"><a href="#1-3-可用性" class="headerlink" title="1.3 可用性"></a>1.3 可用性</h3><p>我们希望一个系统是可靠的，如果一台计算机执行任务，那应该是可靠的，一台计算机工作很长时间还是可实现的。但是分布式系统不一样，分布式有非常多的计算机构成，只要数量足够大，那故障无时无刻都可能发生，能正常运行的条件很苛刻，但是出现故障的原因有很多。</p>
+<p>既然现实层面故障是不可避免的，那就要想办法能在应用上屏蔽错误，掩盖错误，也就是系统需要设计出可用性，容错性，有一些错误系统也可以正常运作，提供服务。</p>
+<p>比如构建多副本系统，其中一个故障，另一个可用，整个系统仍是可用的，但是都故障了，系统就不可用了。</p>
+<p>除了有可用性，还有可恢复性，就是除了问题修复后系统仍然可以运行。可恢复性相比可用性是更弱的需求。</p>
+<p>一个具有可恢复性的系统可能需要一些额外的操作，比如把最新的数据放在磁盘，以便重启服务的时候恢复数据。</p>
+<p>为了实现可恢复性，可能需要：</p>
+<p>非易失存储，类似硬盘，机房出现故障，但是可以存放checkpoint或者log在这些存储设备中，系统修复后就可以从硬盘中读取最新的状态进行恢复。 </p>
+<p>可以实现容错的重要工具是：复制，复制也就是实现一个多副本系统，多副本系统有一个棘手的问题就是多个副本之间很可能突然不同步，那就不是互相为副本了，任何一个通过多副本实现容错的系统都面临这个问题。</p>
+<h3 id="1-4-一致性"><a href="#1-4-一致性" class="headerlink" title="1.4 一致性"></a>1.4 一致性</h3><p>如果我们构建一个键值对的分布式存储服务，只支持两种操作：put和get。</p>
+<p>一致性就是用来定义操作行为的概念。</p>
+<p>从容错的角度来说，我们通常有多个副本。如果是非分布式系统，就一个服务器，一个表单，那put和get操作不会有任何歧义。但一个分布式系统，由于复制或者缓存，一个数据存在在多个副本中，可能有多个不同版本的key-value。</p>
+<p>比如服务器有两个服务，原本两个服务器的key&#x3D;1的value&#x3D;20，客户端发送put请求，将key&#x3D;1改为21，相同的请求需要发送到两个服务器，在发送给第二个服务器的时候出现故障了，第二个服务器的key&#x3D;1还是value&#x3D;20。两个副本的数据就不同步了。</p>
+<p>一致性一般分两种：</p>
+<p>每一次get都得到最新的写入的数据，这就是强一致性。</p>
+<p>不保证每一次get都得到最新写入的数据，可能是旧数据，就是弱一致性。</p>
+<p>弱一致性很有用，因为虽然强一致性可以保证得到最新的数据，但是代价太高了，需要分布式系统做大量的通信，带来昂贵的通信问题。弱一致性可以带来更高的性能，可以从最近的副本获得数据。</p>
+<h3 id="1-5-分布式计算-——-MapReduce"><a href="#1-5-分布式计算-——-MapReduce" class="headerlink" title="1.5 分布式计算 —— MapReduce"></a>1.5 分布式计算 —— MapReduce</h3><p>谷歌想要在大量计算机上快速处理大量数据的分布式软件，以为就是把问题分包给大量计算机，管理运算，取回数据。</p>
+<p>如果需要对任意数据进行分析计算，就需要一个框架，工程师只需要实现程序核心，程序就可以跑在分布式系统上，快速完成任务。这个框架就是MapReduce。</p>
+<p>MapReduce的思想：应用程序的设计人员、分布式运算的使用人员，只需要编写Map函数和Reduce函数，不需要知道任何分布式相关的事情，框架直接解决剩下的问题。</p>
+<p>第一阶段，运行Map函数。</p>
+<p>抽象地来说，MapReduce假设有一些输入，输入可能是大量的文件或者数据块，框架启动后会寻找Map函数，然后对输入的每个文件数据库都运行Map函数，这里就可以用到并行运算，比如运行多个只关注输入的Map函数。</p>
+<p>Map函数输出一个key-value键值对的列表，如果是一个简单的job：单词计数器，那么Map函数就会输出键值对：key为单词，value为1。Map函数对输入文件中的每个单词进行拆分，输出一个key-value键值对。假设文件1有a，b两个单词，就输出key&#x3D;a,value&#x3D;1和key&#x3D;b，value&#x3D;1.第二个Map函数接收了文件2，里面有单词b，那么就输出key&#x3D;b,value&#x3D;2。以此类推。对所有输入的文件&#x2F;数据块都运行了Map函数就能得到中间输出，也就是所有Map函数输出的所有key-value键值对</p>
+<p>接下来就是第二阶段，运行Reduce函数。</p>
+<p>第一阶段收集到的所有中间输出，也就是那些key-value键值对，对于单词计数器，框架会先收集每个key&#x3D;a的key-value键值对（中间输出），收集完提交给reduce函数。然后手机所有的key&#x3D;b的中间输出。以此类推。这里的收集是真的收集，因为key&#x3D;b的中间输出是由不同的计算机的不同的Map函数生成的，这里需要将数据从一台计算机转移到另一个计算机。</p>
+<p>Reduce函数的入参是所有key&#x3D;a或者key&#x3D;b…的key-vaue键值对。也就是框架对所有Map函数输出的每一个Key都调用一次Reduce函数。</p>
+<p>单词计数器的任务，Reduce函数只需要统计传入的参数的长度就可以，因为每个键值对都是一个单词。最后每个Reduce函数都输出一个与key代表单词相关的数量，比如第一个reduce函数输出a&#x3D;2，第二个reduce函数输出b&#x3D;2…</p>
+<p>一个典型的MapReduce Job就差不多这样。</p>
+<p>一些重要的术语：</p>
+<ol>
+<li>Job，一整个MapReduce的计算称为Job。</li>
+<li>Task，每一次Map或者Reduce函数的调用称为Task。</li>
+</ol>
+<p>所以一个完整的MapReduce Job由一些Map Task和Reduce Task组成。</p>
+<h3 id="1-6-Map函数和Reduce函数"><a href="#1-6-Map函数和Reduce函数" class="headerlink" title="1.6 Map函数和Reduce函数"></a>1.6 Map函数和Reduce函数</h3><p>Map函数参数一个key和一个value，这个函数就是编程语言写的，比如Java，C++之类的。key一般是输入文件的名字，不太重要，value就是输入文件的内容。</p>
+<p>对于单词计数器，value包含要统计单词的文本，首先需要拆分文本内容为单词，对每个单词调用一个叫emit的函数，这个函数的参数一个是key一个是value，也就是中间输出的那个key和value（？），单词计数器的中间输出就是key&#x3D;单词，value&#x3D;”1”字符串的键值对，所以emit函数的参数key是单词，value就是字符串”1”。</p>
+<p>编写Map函数就这么简单，不需要知道什么分布式，什么网络传输。</p>
+<p>Reduce函数入参是某个特定key的所有实例，比如单词计数器的Job中，所有key&#x3D;a的键值对中间输出实例。所以Reduce函数参数也是一个key和一个value作为参数。value是一个数组，里面的元素是框架收集的中间输出的第一个参数key的所有value实例。对于单词计数器这个Job，key就是单词，value就是由”1”字符串组成的数组，所以只需要关心长度就可以了（在单词计数器这个Job）。Reduce也有emit函数，这里的emit只接受一个参数value，value会作为Reduce函数入参中key的最终输出，对于单词计数器，只需要给emit传入数组的长度，Reduce函数就会输出最终结果。</p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2023-06-21</span><i class="fa fa-tag"></i></div></div></div></div><div class="share"><div class="evernote"><a class="fa fa-bookmark" href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank"></a></div><div class="weibo"><a class="fa fa-weibo" href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));"></a></div><div class="twitter"><a class="fa fa-twitter" target="_blank" rel="noopener" href="http://twitter.com/home?status=,http://example.com/2023/06/21/distributed-01/,Minho hooooo.,关于分布式以及MapReduce,;"></a></div></div><div class="pagination"><ul class="clearfix"><li class="next pagbuttons"><a class="btn" role="navigation" href="/2023/06/15/about-docker-apt-mirror/" title="关于Docker容器apt换源">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>
