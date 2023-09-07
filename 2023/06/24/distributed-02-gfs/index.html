@@ -1,0 +1,77 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author"><title>分布式存储的实践 —— GFS · Minho hooooo.</title><meta name="description" content="2.1 分布式存储难点存储很关键，对于构建一个大型分布式存储，设计一个简单的存储接口非常有用。GFS讨论了并行性能，容错，复制，一致性。
+分布式系统为什么难？为什么需要做那么多工作才能让他运作？
+人们使用分布式系统或者大型存储系统的出发点就是获得更好的性能加成，用数以百计的计算机资源同时完成大量任务"><meta name="keywords"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">Minho hooooo.</a></h3></div></div><ul class="social-links"></ul><div class="footer"><a target="_blank" href="/"><span>Theme by </span></a><a target="_blank" rel="noopener" href="https://www.caicai.me"> CaiCai </a><span>&</span><a target="_blank" rel="noopener" href="https://github.com/Ben02/hexo-theme-Anatole"> Ben</a><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">Home</a></li><li><a href="/about">Sobre</a></li><li><a href="/archives">Arquivo</a></li><li><a href="/links">Links</a></li></div><div class="information"><div class="back_btn"><li><a class="fa fa-chevron-left" onclick="window.history.go(-1)"> </a></li></div><div class="avatar"><img></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>分布式存储的实践 —— GFS</a></h3></div><div class="post-content"><h3 id="2-1-分布式存储难点"><a href="#2-1-分布式存储难点" class="headerlink" title="2.1 分布式存储难点"></a>2.1 分布式存储难点</h3><p>存储很关键，对于构建一个大型分布式存储，设计一个简单的存储接口非常有用。GFS讨论了并行性能，容错，复制，一致性。</p>
+<p>分布式系统为什么难？为什么需要做那么多工作才能让他运作？</p>
+<p>人们使用分布式系统或者大型存储系统的出发点就是获得更好的性能加成，用数以百计的计算机资源同时完成大量任务。很自然的想法就是把数据分割，放在多台服务器上，这种方式称之为分片。</p>
+<p>如果在成败上千台服务器上进行分片，那么故障就会常态化，这时候就要引入容错性的话题，也就是出现故障，整个系统也应该正常运作提供服务。</p>
+<p>实现容错的最有用的办法就是：复制，也就是维护多个数据副本，一个故障了，其他还可以使用。但是关键的是，一个不小心，就会出现副本之间不一致的情况，就有了一致性的问题。要避免一致性，就需要服务器之间更多的网络通信交互，但这又会降低性能。这是一种循环，需要找到一个平衡点吗，构建一个好的系统。</p>
+<p>如果要好的性能，就需要忍受一定的不一致性；如果要好的一致性，就需要牺牲一定的性能。</p>
+<h3 id="2-2-错误的设计"><a href="#2-2-错误的设计" class="headerlink" title="2.2 错误的设计"></a>2.2 错误的设计</h3><p>具备强一致性或者好的一致性的系统，可以让应用程序和客户端看起来像是和一台服务器在通信。</p>
+<p>对于存储服务器，执行一次写请求就是向磁盘写入一个数据或者对数据进行一次修改；对于一次读请求，就是将之前写入的数据从表单中取出来。</p>
+<p>对于只有一台服务器的系统，如果执行两次写请求，之后执行读请求，那么就会出现模糊的情况，你可能读取到的值取决于两次写请求谁最后写入。单个服务器容错性太差，服务器坏了直接服务不可用，所以一般都会构建多副本的分布式系统，这就是所有问题的源头。</p>
+<p>一个糟糕的多副本设计是这样的，有两台服务器，每个服务器都有数据的一份完整拷贝，都在磁盘上有一个key-value表单，我们当然希望两个表单完全一致，这样一个服务器坏了，就去另一个服务器读写。</p>
+<p>两个表单一致，意味着每次写请求，需要在两台服务器上执行。读请求只需要在一台服务器上执行就可以，这就是容错性。但是如果两个客户端都要执行写请求，就要出现问题了，<strong>我们没办法保证两台服务器都以相同的顺序处理两个客户端的请求</strong>。这就会导致两台服务器数据可能出现不一致，后续的读请求获得的数据完全取决于请求的服务器是哪个副本。如果要修复这种不一致的错误，就要服务器之间更多的通信，提升复杂度。我们需要一种一致性和复杂度的平衡。</p>
+<h3 id="2-3-GFS设计目标"><a href="#2-3-GFS设计目标" class="headerlink" title="2.3 GFS设计目标"></a>2.3 GFS设计目标</h3><p>GFS即Google File System，GFS解决了许多前面提到的问题，不过还不够完美。</p>
+<p>谷歌的目的在于构建一个 大型的，快速的，全局有效的文件系统，来应对不同应用程序从中读取数据的需求。有一种构建大型存储系统的方法是量身定制，但是没有通用性，太麻烦了。有个通用的全局存储系统，通过申请权限就可以获取数据。</p>
+<p>为了大容量和快速，每个包含数据的文件都被GFS分割放在多个服务器上，也就是前面提到的分片，这样读取就会很快，从多个服务器上读取同一个文件，获得更高的聚合吞吐，分割还可以让系统存储比单个磁盘更大的文件。</p>
+<p>那么自动恢复就很重要，每次出故障都派人区服务器修或者迁移数据太麻烦，希望系统可以自己修复自己。</p>
+<p>GFS被设计成在一个数据中心运行。GFS为TB级别文件而生，只顺序处理，不支持随机访问，他的关注点不在降低延迟，而在巨大的吞吐上。</p>
+<h3 id="2-4-GFS-Master节点"><a href="#2-4-GFS-Master节点" class="headerlink" title="2.4 GFS Master节点"></a>2.4 GFS Master节点</h3><p>GFS有上百个客户端，一个Master节点，大量Chunk（块）服务器。GFS中的Master是Active-Standby（双机热备模式），所以只有一个master节点工作，master节点保存文件名和存储位置的对应关系。每个Chunk服务器上有几个硬盘。</p>
+<p>Master节点管理 文件 和 Chunk 的信息，Chunk服务器用来存储实际的数据。GFS设计中，将这两类数据管理分开了。Master节点知道每个文件对应的Chunk的ID，每个Chunk大小64MB，他们共同构成这个文件。master节点知道每个文件第一个chunk，第二个第三个在哪个服务器上，这样就能直接从chunk服务器上读取chunk数据。</p>
+<p>master节点内保存两个表单：</p>
+<ol>
+<li>文件名 到 Chunk ID或者Chunk Handle数组的对应：文件对应那些Chunk。</li>
+<li>只有Chunk ID没有太大作用，第二个表单记录Chunk ID到具体Chunk数据的对应关系<ol>
+<li>每个Chunk ID对应的Chunk存储在哪个服务器上，也就是Chunk服务器的列表</li>
+<li>每个Chunk的当前版本号，Master节点必须记住每个Chunk对应的版本号</li>
+<li>对于每个Chunk的读写必须在主chunk上顺序处理，chunk是多副本模式，master节点必须记住哪个chunk服务器有主chunk</li>
+<li>主chunk只在一定时间担任主chunk，master还要记住主chunk租约过期时间z</li>
+</ol>
+</li>
+</ol>
+<p>这些数据都在内存中，如果master故障就会丢失，所以master节点会同时把数据持久化在硬盘，也就是存储log。生成checkpoint。</p>
+<p>master需要存储在硬盘上的数据：</p>
+<ol>
+<li>Chunk Handle数组，也就是第一个表单，每个文件对应哪些Chunk ID</li>
+<li>版本号</li>
+</ol>
+<p>不需要写入磁盘的数据：</p>
+<ol>
+<li>Chunk服务器列表，每次master重启都会与所有chunk服务器通信，<strong>并询问每个chunk服务器有哪些chunk</strong></li>
+<li>主chunk的id，master重启之后就忘了，等租约一过，就饿可以安全执行新的主chunk</li>
+<li>租约时间</li>
+</ol>
+<p>master节点重启，如果从log最开始重建太慢了，一般都是在磁盘创建一些checkpoint点，然后重启时从log中最近的一个checkpoint开始逐个恢复到自己的状态。</p>
+<h3 id="2-5-GFS读文件"><a href="#2-5-GFS读文件" class="headerlink" title="2.5 GFS读文件"></a>2.5 GFS读文件</h3><p>读文件两个步骤：</p>
+<ol>
+<li>客户端把想要读取的文件名和偏移量offset发送给master</li>
+<li>master从file表单中找文件名，然后计算出对应的chunk id，再从chunk表单中找到存有对应chunk的服务器列表，然后把chunk handle（id）和服务器列表发送给客户端</li>
+</ol>
+<p>客户端从这些chunk服务器中选一个读取数据，一般是选网络上最近的服务器，然后把请求发给对应服务器，客户端可能会多次读取同一个chunk不同位置，所以客户端会缓存chunk和服务器对应关系，免去每次每次都询问master的麻烦。</p>
+<p>客户端与选中的chunk服务器通信，把chunk handle（id）和offset发送给那个chunk服务器，chunk服务器在本次硬盘上存储的chunk文件根据id找出来，读取对应数据段返回给客户端，可以推测chunk服务器上存储chunk数据命名应该是按照handle也就是id命名。</p>
+<p>流程就是这样呗：</p>
+<p>“master，我想读取这个文件的这个偏移量的数据”</p>
+<p>“好的，这个文件这个offset的chunk id是xxx，对应的服务器列表【xxx，yyy，zzz】”</p>
+<p>“yyy，你离我最近，我想要chunk id为xxx，offset为kkk的数据”</p>
+<p>“好的，我在本地文件里给你找找，返回给你对应的数据”</p>
+<p>如果一次读取跨越了chunk，应用程序会通过一个库向GFS发送RPC，将一个请求拆分成两个读请求发送给master，所以可能是一个请求获得两次结果，然后向两个chunk服务器读取数据。</p>
+<p>客户端可以自己算出来是第几个chunk，但是只有master知道对应chunk在哪个服务器上。</p>
+<p>从哪个chunk服务器上读取数据重要也不重要，他们之间互为副本，也就可能出现不一致的情况。所以gfs的客户端会尝试从同一个机架或者交换机上的服务器读取数据。</p>
+<h3 id="2-6-GFS写文件"><a href="#2-6-GFS写文件" class="headerlink" title="2.6 GFS写文件"></a>2.6 GFS写文件</h3><p>GFS写比读复杂有趣，写和读接口差不多，写文件就是应用程序告诉GFS库，我要对某个文件在某个数据段写入存在buffer的数据，GFS论文里只讨论追加，也就是告诉GFS库我要对某个文件追加buffer中的数据。所以对于写文件，客户端会对master说：<strong>我要对某个文件追加buffer中数据，请告诉我这个文件最后的chunk位置。</strong></p>
+<p>因为多个客户端同时写的话，他们都不知道文件到底多长，也就不知道往什么偏移量或者哪个chunk追加，这时候就需要客户端向master问哪个chunk服务器保存了某个文件的最后一个chunk。</p>
+<p>读文件从任意的最新副本读都可以，但是<strong>写只能往chunk的主副本写。</strong></p>
+<p>如果chunk的主副本不存在，master就要找到对应chunk的所有<strong>最新</strong>副本的服务器。因为多副本可能会导致不一致，master必须负责找出最新的chunk所在服务器，告诉客户端，往哪个chunk服务器通信。</p>
+<p>每个chunk有多个副本，最新的副本是说副本保存的版本号和master中记录的版本号一样，master决定chunk副本中的版本号，所以master知道对应chunk的哪个版本号最新，所以chunk的版本号需要master持久化存储在硬盘中，如果故障丢了版本号，master就不知道谁 最新了。</p>
+<p>为什么不把chunk所有副本中最大的版本号作为最新版本号，而是master持久化存储在硬盘上对应chunk的最新版本号？因为如果持有最新chunk的服务器宕机了，那得到的最新版本号就是错的！</p>
+<p>如果客户端想向某个文件追加，但是不知道文件末尾那个chunk的主副本在哪个服务器上，master就会等所有存储了<strong>最新</strong>chunk版本的服务器集合完成，挑选一个primary，也就是主副本所在服务器，发送给客户端用来追加。之后master就增加一次版本号然后持久化保存。然后master告诉所有primary和secondary谁是primary谁是secondary，对应的chunk服务器也会自己把版本号存储在本地磁盘，方便除了故障重启之后还能告诉master自己的版本号。</p>
+<p>primay会接收客户端的写请求，然后应用在所有的副本chunk中。</p>
+<p>GFS用一个很聪明的办法实现了写请求的执行序列。</p>
+<ol>
+<li>客户端从master节点中获取了最新的chunk所在服务器以及副本服务器的列表，所以客户端将数据发送给primary和所有的secondary，这些服务器把数据写入一个临时的位置，并返回给客户端说写入临时位置成功。</li>
+<li>客户端收到所有的成功消息之后会告诉primary，你和所有secondary都有了要追加的数据，开始追加吧。</li>
+<li>primary可能会收到大量客户端并发请求，它会按照某种顺序一次只执行一个请求。</li>
+<li>对于每一个客户端的追加请求，primary都会查看要追加的文件的末尾，确保空间足够，然后把要追加的数据追加到末尾，并通知所有的secondary把临时位置的数据追加到文件</li>
+<li>所有的secondary都返回给primary追加成功的yes后，primary就告诉客户端说追加成功了</li>
+<li>如果至少有一个secondary没有回复yes，primary就告诉客户端说失败了，重试吧。这时候客户端就要重新发起追加过程了，先和master交互，找到末尾的chunk和对应chunk所在的所有主副本所在服务器和副本所在服务器，发起数据追加。</li>
+</ol>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2023-06-24</span><i class="fa fa-tag"></i></div></div></div></div><div class="share"><div class="evernote"><a class="fa fa-bookmark" href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank"></a></div><div class="weibo"><a class="fa fa-weibo" href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));"></a></div><div class="twitter"><a class="fa fa-twitter" target="_blank" rel="noopener" href="http://twitter.com/home?status=,http://example.com/2023/06/24/distributed-02-gfs/,Minho hooooo.,分布式存储的实践 —— GFS,;"></a></div></div><div class="pagination"><ul class="clearfix"><li class="next pagbuttons"><a class="btn" role="navigation" href="/2023/06/21/distributed-01/" title="关于分布式以及MapReduce">Próximo post</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>
