@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author"><title>分布式共识算法 —— Raft · Minho hooooo.</title><meta name="description" content="4.1 脑裂 Split Brain之前接触了几个具备容错性的系统：
+
+MapReduce：复制了计算，但整个框架被一个单主节点Master控制
+GFS以主-备Primary-Backup方式复制数据，也依赖一个单节点确定每份数据的主拷贝在哪
+VMware FT在Primary和Backup之间复制"><meta name="keywords"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">Minho hooooo.</a></h3></div></div><ul class="social-links"></ul><div class="footer"><a target="_blank" href="/"><span>Theme by </span></a><a target="_blank" rel="noopener" href="https://www.caicai.me"> CaiCai </a><span>&</span><a target="_blank" rel="noopener" href="https://github.com/Ben02/hexo-theme-Anatole"> Ben</a><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">Home</a></li><li><a href="/about">Sobre</a></li><li><a href="/archives">Arquivo</a></li><li><a href="/links">Links</a></li></div><div class="information"><div class="back_btn"><li><a class="fa fa-chevron-left" onclick="window.history.go(-1)"> </a></li></div><div class="avatar"><img></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>分布式共识算法 —— Raft</a></h3></div><div class="post-content"><h3 id="4-1-脑裂-Split-Brain"><a href="#4-1-脑裂-Split-Brain" class="headerlink" title="4.1 脑裂 Split Brain"></a>4.1 脑裂 Split Brain</h3><p>之前接触了几个具备容错性的系统：</p>
+<ol>
+<li>MapReduce：复制了计算，但整个框架被一个单主节点Master控制</li>
+<li>GFS以主-备Primary-Backup方式复制数据，也依赖一个单节点确定每份数据的主拷贝在哪</li>
+<li>VMware FT在Primary和Backup之间复制计算相关的指令，如果其中一个出现问题，需要一个第三方的Test-and-Set服务来确认，Primary和Backup只有一个能接管计算任务</li>
+</ol>
+<p>可以说这些系统把容错的关键都转移到了单个节点，这个单节点在系统局部出现故障的时候决定主拷贝来继续工作。使用单节点来决策的原因是，要避免脑裂。</p>
+<p>脑裂是个很严重的问题，在VMware FT中，如果对决策的Test-and-Set服务施行多副本，假设存在于两个服务器s1,s2中，两个客户端c1,c2是FT的Primary和Backup虚拟机。</p>
+<p>问题就是，如果一个客户端无法和所有服务器都通信怎么办，比如c1只能访问s1，无法访问s2，我们不想让c1只和s1通信，这会导致s1和s2不一致，客户端的任何操作必须和s1，s2都保持通信，那么容错性就没有了，只要一个服务器出问题，整个服务都停止了。</p>
+<p>如果只和一个通信就可以呢？最糟糕的就是，俩服务器其实都在运行，但是c1只能和s1通信，c2只能和s2通信，网络被一分为二。这时候c1给s1说设置自己为primary，但是s2还不知道，c2让s2设置自己为primary，s1也不知道，俩client都是主虚拟机了，这就是脑裂。</p>
+<p>所以，对于有两个拷贝副本的决策节点，只有两种选选择：</p>
+<ol>
+<li>等待两个服务器都响应，那就没有容错性</li>
+<li>等待一个服务器响应就可以，就会出现脑裂</li>
+</ol>
+<p>很久以前解决的办法就两种：</p>
+<ol>
+<li>花钱，构建可靠网络，让两个服务器响应都正常</li>
+<li>人工解决，一个不响应了就call给运维，这时候其实也是单节点决策，这个人就是那个节点</li>
+</ol>
+<h3 id="4-2-过半票决-Majority-Vote"><a href="#4-2-过半票决-Majority-Vote" class="headerlink" title="4.2 过半票决 Majority Vote"></a>4.2 过半票决 Majority Vote</h3><p>这个过半票决很有意思。</p>
+<p>因为脑裂的存在，也就是网络出现故障，被分割成两半，两边独立运行，无法访问对方。这时候就需要一种自动完成故障切换的系统。</p>
+<p>就是为了解决这个，出现了过半票决，在论文里这是构建Raft的基本概念。构建过半票决系统的第一步关键在要有<strong>奇数</strong>的服务器，如果是偶数就可能出先对称两边不过半，不太好。</p>
+<p>如果服务器是奇数，当出现脑裂的时候，有一个分区的服务器总是过半，比如三个服务器，有一个会有两个服务器。过半票决吸引人的地方在于，<strong>任何操作都必须凑够过半的服务器批准，才能完成。</strong>这里的过半是所有服务器的数量的过半，无论是否运行。</p>
+<p>也就是，如果有 2 * f + 1 个服务器，最多可以接受f个服务器出故障，仍然可以运行。</p>
+<p>过半票决系统的一个特性就是，最多有一个网络分区有过半的服务器，所以不可能有多个分区可以同时完成操作。还有一个有意思的，微妙的就是，如果有一系列的操作需要完成，每一次操作都需要过半的服务器批准。比如选举Raft的Leader，每一次操作对应过半服务器，<strong>必然至少存在一个服务器存在于上次操作的过半服务器</strong>，（也就是我这次凑够过半的服务器，下次再凑够过半的服务器，肯定至少有一个服务器在这次和下次都存在于过半服务器中）。Raft更依赖于这个特性避免脑裂。</p>
+<p>比如每次RaftLeader需选举成功，都肯定凑够了过半的服务器选票，而这过半的服务器里，肯定至少有一个服务器与上一次Leader选举的过半服务器有重叠，所以新的Leader一定可以知道旧Leader的任期号。类似的，必然有至少一个服务器包含了旧Leader的所有操作，这也是为什么Raft可以正确运行的关键。真的有意思。</p>
+<p>过半票决思想产生了两个系统，一个是Paxos，一个是VSR，Raft从设计上更接近VSR。</p>
+<h3 id="4-3-初探Raft"><a href="#4-3-初探Raft" class="headerlink" title="4.3 初探Raft"></a>4.3 初探Raft</h3><p>Raft以库 Library的形式存在于服务中，一个基于Raft的多副本服务，每个副本由两部分组成：<strong>应用程序代码和Raft库</strong>。应用程序代码就用来接收RPC或者其他形式的客户端的请求，不同副本节点的Raft库之间相互合作维护节点同步。</p>
+<p>软件角度看，上层的应用程序代码需要对Raft库进行函数调用，传递自己的状态和Raft反馈的信息。</p>
+<p>Raft自身也会有状态，也要保持，表现在会记录操作的日志log。</p>
+<p>假如我们有一个三副本的系统，三个服务器有完全一样的结构，上面应用程序代码，下面Raft库。</p>
+<p>客户端就是一堆外部代码，要使用服务的，他们没必要知道自己在和一个多副本系统打交道。</p>
+<p>客户端把请求发送给基于Raft构建的副本集群中的Leader节点，这是一种应用级别的请求，比如访问k-v数据库，put或者get操作。</p>
+<p>关键点在于，一个请求不会立马被应用程序执行，客户端发送的请求会被应用程序中对应的操作<strong>先发送给Raft层</strong>，告诉Raft层：我要把这个操作提交到多副本的Log中，完成了告诉我。</p>
+<p>Raft节点之间开始相互交互，<strong>过半的节点</strong>将操作记录进log中，就可以了。这时候Raft的Leader节点知道过半的节点都记录操作了，就向上发通知给应用程序，说你给我的操作我给所有（过半）的副本了，你可以在应用层面执行了。</p>
+<h3 id="4-4-Raft的Log同步"><a href="#4-4-Raft的Log同步" class="headerlink" title="4.4 Raft的Log同步"></a>4.4 Raft的Log同步</h3><p>Raft层的内部消息交互如何工作的呢？</p>
+<p>比如有三个副本服务器，客户端向其中的Leader发送了Put请求，这时候Leader会发送一个**添加日志（AppendEntries)**的RPC给其他的副本节点，然后Leader一直等着其他副本响应，只要包括自己在内过半的节点对AppendEntries响应，Leader就会在应用层面执行来自客户端请求，并且得到结果后返回给客户端。</p>
+<p>因为只要过半的服务器响应就会执行，剩下的也会响应AppendEntries给Leader，这个响应依然有效，但Leader不需要等待这些响应。</p>
+<p>只要系统没有故障，操作大概就是这样。</p>
+<p>那么，Leader如果可以在应用层面执行了，那其他副本如何同Leader同步呢？</p>
+<p>当Leader知道过半服务器已经添加操作进log之后，就执行客户端请求后返回结果给客户端，但那些添加log的服务器还不知道Leader到底提交没有（提交就是在应用层面执行成功，并且返回结果给客户端了），所以一般Leader需要发送一个额外的消息给这些副本服务器，在Raft中，commited消息被夹在在下一次AppendEntries里，或者是Leader发送心跳的时候。只要commit消息被其他副本接收到了，他们就知道之前的这个commit号被Leader提交了，也会在应用层面执行对应的请求，更新本地的状态。</p>
+<p>这样夹杂的方式可能导致副本之间的同步不及时，但只要AppendEntries频率高，就无所谓了。实在是太慢了就会发心跳。而且客户端其实只在乎Leader的执行请求，其他副本执行完成没有不太重要，不会影响客户端的体验。</p>
+<h3 id="4-5-Raft的Log"><a href="#4-5-Raft的Log" class="headerlink" title="4.5 Raft的Log"></a>4.5 Raft的Log</h3><p>为什么Raft的Log很重要？</p>
+<p>第一，因为Log是Leader用来对操作排序的一种手段，<strong>这对复制状态机很重要。</strong>对于复制状态机，不仅所有副本需要执行相同操作，而且顺序还要一致。比如一个客户端发送10个请求，Leader必须保证所有副本按照和它自己一样的顺序执行命令。</p>
+<p>第二，因为客户端请求发送来之后，Leader通知各个副本请求，但各个副本还不能执行，需要找地方把操作保存起来，直到收到Leader的commit号才能真正执行，所以对于Raft的Follower，Log可以临时存储操作。</p>
+<p>第三，Leader需要在Log中记录操作，如果Follower因为网络之类的原因离线了，丢消息了，Leader就可以向Follower发送丢失的Log消息。也就是Leader需要一个地方存储客户端请求的拷贝，对那些已经commit的请求，为了向丢失相应操作的副本重传而保存到log中。</p>
+<p>还有一个重要的原因，就是Log可以让重启的服务器快速恢复状态。一个重启的服务器，需要使用存在磁盘上的Log从头执行操作重建故障之前的状态，所以Log需要持久化存储。</p>
+<p>如果Leader也出故障了，系统会进行Leader选举，新Leader发送一次心跳搞清楚整个系统执行到的位置。</p>
+<h3 id="4-6-应用层接口"><a href="#4-6-应用层接口" class="headerlink" title="4.6 应用层接口"></a>4.6 应用层接口</h3><p>Raft集群中，每个副本的应用层和Raft库层都有两个接口：</p>
+<ol>
+<li>应用层用来转发客户端的请求给Raft库层，告诉Raft层把这个请求放在Log里，这个接口表现为一个函数调用，这个函数是Start函数，参数化只有一个，就是客户端的请求。应用层告诉Raft层：我接收到了一个客户端请求，把它存在log中，commit之后告诉我。</li>
+<li>随着时间推移，Raft层要通知应用层：你刚才在Start函数给我的请求我已经commit了。这个通知不一定是最近一次start函数传入的请求。这个向上的接口以go channel的一条消息的形式存在。Raft发送给应用层这个消息后，应用层要读取这个消息，这里就有一个叫applyCh的channel，通过它发送ApplyMsg消息。</li>
+</ol>
+<p>应用层需要知道从applyCh读取的消息对应之前哪个start函数，所以start函数的返回值需要信息足够多，包括请求将存放在log中的位置。返回任期号之类的。</p>
+<p>所有副本都会收到这个ApplyMsg消息，他们都要执行这个请求，把它应用在本地状态中。所有副本节点都会拿到log位置信息，但是这只对leader有用，以为leader需要知道ApplyMsg（就是raft层给应用层的消息）中的请求到底对应哪个客户端的请求（哪次start函数调用），然后对客户端进行响应。</p>
+<p>为什么不在Start函数返回的时候就响应客户端请求？</p>
+<p>假设一个客户端发送了get请求，然后等待响应。应用层接收到了客户端发来的RPC后，会调用Start函数，这个函数会立即返回，但是应用层不会响应消息给客户端，以为应用层还没有执行客户端的请求，它要等Raft层commit 了这个请求，如果请求没有被raft层commit，比如应用层调用了start函数，函数返回之后就故障了，那raft层就必然没有发送ApplyEntries给其他副本，所以无法执行commit。</p>
+<p>也就是说，实际上start函数返回了，但是随着时间的推移，只有这个客户端的请求的ApplyMsg从apply channel中出现在应用层（就是raft层已经完成commit了，调用applyCh发送消息给应用层说我commit完啦，你应用层执行吧），应用层才会真的执行这个请求，响应给客户端。</p>
+<p>对于Log来说，不同副本的Log可能会暂时不同，起码不同副本的log末尾可能暂时不同，例如一个Leader还没把一轮AppendEntries发送完成，就故障了，那有的副本就有新的log，有的就没有。不过对于raft来说，raft最终会强制让不同副本的log保持一致，<strong>即使会短暂不同，长期看所有的副本log都会被leader修改到它认为一致。</strong></p>
+<h3 id="4-7-Leader选举"><a href="#4-7-Leader选举" class="headerlink" title="4.7 Leader选举"></a>4.7 Leader选举</h3><p>关于raft很重要的两个主题：选举怎么工作的 和 Leader怎么处理上面说的短暂的不同副本差异。</p>
+<p>为什么要有一个Leader，Paxos系统没有Leader。Raft系统有leader是因为会使整个系统变得更加高效，有一个大家公认的leader，只需要一轮消息就可以获得过半服务器的认可，没有leader的系统需要一轮消息确认一个临时leader，一轮消息确认请求。</p>
+<p>Raft系统的生命周期有很多不同的leader，用 任期号 term number区分。followers不需要知道leader的id，只需要知道任期号就可以。<strong>每个任期最多一个leader</strong>，也就是对于一个任期，状态就是要么还没有leader，要么就一个leader，不可能有多个leader。</p>
+<p>leader的选举通过选举定时器（election timer）产生，定时器耗尽之前，当前节点没有收到任何leader的appendEntries等消息，节点就认为leader下线了，开始一次选举，试图让自己成为新leader。</p>
+<p>开始一次选举，服务器就会增加一次任期号，一个节点要成为新的leader，需要发送请求投票的rpc，并且过半服务器支持自己，其中包括自己，因为选举开始的时候节点会把自己的票投给自己。</p>
+<p>并不是leader没有故障就不会选举，如果有故障一定会有新选举。选举的前提是其他服务器还在运行，因为选举的触发条件是其他服务器<strong>选举定时器超时</strong>了。即使leader正常运行，但如果网络太慢或者丢了几个心跳，就会开始新的选举。</p>
+<p>如果出现网络分区，在一个分区中选举出了新的leader，旧leader还不知道怎么办？</p>
+<p>这里，客户端发送给旧leader的操作因为无法凑够过半服务器，无法commit，也无法执行客户端的请求。</p>
+<p>raft如何确保每个任期最多一个leader呢？</p>
+<p>leader的候选人为了获选，需要获得<strong>过半服务器的支持</strong>，每个raft节点在一个任期内只投出一个票，这就意味着任意一个任期内，不可能有两个候选人都获得过半的选票，只有一个候选人在这个任期获选。</p>
+<p>如果选举成功了，集群的其他节点怎么知道？</p>
+<p>如果一个节点获得过半选票，他就知道自己是新leader了。但是其他服务器还不知道谁赢了选举，甚至不知道有人赢了选举。raft规定获选的候选人需要发送心跳给其他服务器，也就是一个appendEntries，但是很隐晦，不会告诉说我就是新leader。raft规定除了当前任期的leader，没人可以发送appendentries消息。</p>
+<p>假如对任期19有一次选举，过了一会我收到一条appendentries，消息的任期号就是19，那么我就知道某个节点赢得了19任期的选举。所以<strong>其他服务器是通过收到特定任期号的appendentries知道选举成功的</strong>。</p>
+<h3 id="4-8-选举定时器"><a href="#4-8-选举定时器" class="headerlink" title="4.8 选举定时器"></a>4.8 选举定时器</h3><p>任何AppendEntires都会重置raft节点的选举定时器，也就是说只要leader在线，而且以合理速率发送心跳或者AppendEntries，就可以阻止其他节点成为新的候选人。除非故障，不然不会有新节点选举。</p>
+<p>如果某次选举选举出0个leader，选举就是失败了。例如过半机器都关机了，网络故障等，导致所有候选人都无法凑齐过半的服务器。</p>
+<p>还有一种导致选举失败的场景，就是系统正常，但是候选人几乎同时参选，分割了选票split vote，比如一个三节点的多副本服务器，他们的选举定时器几乎同时过期，都把票都给自己，收到其他节点的requestvote，都投否定票，这就没节点可以赢得选举，如果所有的定时器过期时间相同，这个状态可能一致持续。</p>
+<p>解决split vote的关键在于，不同节点获得随机的选举定时器时间，总有一个先超时，其他的后超时，只要时间差足够大，总有一个节点先获得过半服务器的选票，成为新的leader。选举定时器的超时时间应该至少大于leader的心跳间隔，不然节点在收到心跳之前会触发选举，而且因为网络可能的不稳定，选举定时器的时间应该是心跳间隔的几倍左右。</p>
+<p>关于定时器的超时时间的设置：</p>
+<p>最大超时时间会影响系统多块从故障中恢复，如果故障出现频率很低就无所谓，如果很高就有影响。</p>
+<p>不同节点的选举定时器的超时时间差应该足够长，使得第一个节点能完成一次选举，这里至少需要大于一条rpc往返的时间。比如一条rpc需要10ms发送，并从其他服务器获得响应，那两个随机数之间的时间差应该大于10ms。</p>
+<h3 id="4-9-异常情况"><a href="#4-9-异常情况" class="headerlink" title="4.9 异常情况"></a>4.9 异常情况</h3><p>一个旧leader故障后，新leader如何整理不同节点的log不一致的问题？</p>
+<p>如果leader正常，followers必须同意并接收leader的log，添加到本地的log中，然后再收到来自leader的commit消息，在本地执行。</p>
+<p>如果leader故障，就可能出现槽位上log的不一致问题。</p>
+<p>如果一个log在过半服务器有记录，就可能已经被commit了，不能丢弃。没有过半的记录就不可能被commit，可以丢弃。</p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2023-06-28</span><i class="fa fa-tag"></i></div></div></div></div><div class="share"><div class="evernote"><a class="fa fa-bookmark" href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank"></a></div><div class="weibo"><a class="fa fa-weibo" href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));"></a></div><div class="twitter"><a class="fa fa-twitter" target="_blank" rel="noopener" href="http://twitter.com/home?status=,http://example.com/2023/06/28/distributed-04-raft/,Minho hooooo.,分布式共识算法 —— Raft,;"></a></div></div><div class="pagination"><ul class="clearfix"><li class="next pagbuttons"><a class="btn" role="navigation" href="/2023/06/25/distributed-03-vmwareft/" title="分布式存储的实践 —— VMware FT">Próximo post</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>
