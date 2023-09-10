@@ -1,0 +1,81 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author"><title>开发日志 —— Raft-KV · Minho hooooo.</title><meta name="description" content="关于RaftRaft是用来管理多副本集群日志一致性的协议，它和multi-Paxos作用相同，效率相当，但是组织结构更加简单，更容易理解，更容易实现。
+共识算法允许多台机器作为一个集群协同工作，其中某些机器故障集群也可以正常运作。
+Raft更容易理解在于它将共识算法分为了三个部分：
+
+Leader "><meta name="keywords"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">Minho hooooo.</a></h3></div></div><ul class="social-links"></ul><div class="footer"><a target="_blank" href="/"><span>Theme by </span></a><a target="_blank" rel="noopener" href="https://www.caicai.me"> CaiCai </a><span>&</span><a target="_blank" rel="noopener" href="https://github.com/Ben02/hexo-theme-Anatole"> Ben</a><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/links">友链</a></li></div><div class="information"><div class="back_btn"><li><a class="fa fa-chevron-left" onclick="window.history.go(-1)"> </a></li></div><div class="avatar"><img></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>开发日志 —— Raft-KV</a></h3></div><div class="post-content"><h3 id="关于Raft"><a href="#关于Raft" class="headerlink" title="关于Raft"></a>关于Raft</h3><p>Raft是用来管理多副本集群日志一致性的协议，它和multi-Paxos作用相同，效率相当，但是组织结构更加简单，更容易理解，更容易实现。</p>
+<p><strong>共识算法</strong>允许多台机器作为一个集群协同工作，其中某些机器故障集群也可以正常运作。</p>
+<p>Raft更容易理解在于它将共识算法分为了三个部分：</p>
+<ol>
+<li><strong>Leader Election</strong> （领导者选举）：一个Leader故障，新的Leader就要被选举出来；</li>
+<li><strong>Log Replication</strong>  （日志复制）：Leader接受到客户端的请求后，需要将Log Entry复制到其它的集群节点，强制所有节点日志和自己保持一致；</li>
+<li><strong>Safety</strong> （安全性）：安全性关键在复制状态机的安全性，只要任何一个服务器将一个特定的Log Entry应用到了自己的状态机中，那么其他服务器节点就不能在同一日志索引上存储另外一条命令。</li>
+</ol>
+<p>并且Raft还包含一个用来解决变更集群成员的新机制，使用重写多数保证安全性。</p>
+<p>Raft相比于现有共识算法的新特性：</p>
+<ol>
+<li><strong>Strong Leader</strong> （强领导性）：例如Log Entry只能从Leader流向Follower，这就简化了日志复制的管理流程；</li>
+<li><strong>Leader Election</strong> （领导选举）：Raft使用随机计数器进行领导选举，Raft在任意共识算法都需要的心跳机制（Heartbeats）上添加了少量机制就解决了很多冲突；</li>
+<li><strong>Membership changes</strong> （成员变更）：Raft在更改集群中服务器集的时候使用 <strong>Joint Consensus</strong>（联合共识）方法，在集群配置转换的时新旧配置大多是重叠的，集群的配置更改期间就可以继续正常运行。</li>
+</ol>
+<h3 id="领导者选举-Leader-Election"><a href="#领导者选举-Leader-Election" class="headerlink" title="领导者选举 (Leader Election)"></a>领导者选举 (Leader Election)</h3><h4 id="状态机角色："><a href="#状态机角色：" class="headerlink" title="状态机角色："></a>状态机角色：</h4><p>一个Raft集群中包含奇数个服务器节点，这些节点在任意一刻只能是以下三种身份之一：</p>
+<ol>
+<li><strong>Leader</strong>（领导者）：处理所有来自客户端的请求；</li>
+<li><strong>Follower</strong>（从属者）：被动节点，不发送任何请求，只响应来自Leader的添加Log请求或者Candidate的票决请求；</li>
+<li><strong>Candidate</strong>（候选者）：临时状态，只有在要选举新Leader的时候才存在。</li>
+</ol>
+<h4 id="状态机转换图："><a href="#状态机转换图：" class="headerlink" title="状态机转换图："></a>状态机转换图：</h4><p><img src="D:/CS-self-Learning/分布式/notes/imgs/01.png" alt="01"></p>
+<blockquote>
+<p>None ——&gt; Follower：集群刚启动，所有节点都是Follower</p>
+<p>Follower ——&gt; Candidate：集群没有Leader或者Leader故障</p>
+<p>Candidate ——&gt; Follower：没有得到过半选票，或者收到更高任期RPC</p>
+<p>Candidate ——&gt; Leader: 得到过半选票</p>
+<p>Candidate ——&gt; Candidate: 没有选出Leader，再来一轮</p>
+<p>Leader ——&gt; Follower: Leader故障，或者其他节点拥有更高任期</p>
+</blockquote>
+<h4 id="需要的RPC"><a href="#需要的RPC" class="headerlink" title="需要的RPC"></a>需要的RPC</h4><h5 id="RequestAppendEntries"><a href="#RequestAppendEntries" class="headerlink" title="RequestAppendEntries"></a>RequestAppendEntries</h5><p>发送AppendEntries RPC的函数，主要发送心跳，接收一个AppendEntrie。</p>
+<p>收到的AppendEntries分几种情况，按照顺序优先处理。</p>
+<ol>
+<li>无论是什么角色，收到的Entry任期大于当前节点任期，当前节点转为Follower，更新当前的任期；</li>
+<li>如果是Candidate角色，收到Entry，和当前任期号相同，说明有一个节点已经赢得选举，当前节点角色转为Follower；</li>
+<li>如果是Follower角色，收到Entry，重置选举定时器；</li>
+<li>如果是Leaer角色，不作任何反应。</li>
+</ol>
+<h5 id="RequestVote"><a href="#RequestVote" class="headerlink" title="RequestVote"></a>RequestVote</h5><p>一个候选人发起选举收集选票，需要过半的服务器支持自己才能成为新的Leader。</p>
+<p>相同的任期内（任期号相同）有多个Candidate，但是对于投票的Follower来说只有一票，投给最先来的请求，通过VoteFor字段保证。</p>
+<p>处理流程：</p>
+<ol>
+<li>因为收到了RPC，重置选举定时器；</li>
+<li>判断发送请求的任期是否更新，更新就转换为Follower并重置投票和任期；</li>
+<li>如果角色是Follower，判断当前节点是否未投票，如果未投就投给收到的第一个节点，如果投了就是给反对票；</li>
+<li>如果是Candidate和Leader，直接给反对票。</li>
+</ol>
+<p>还可以有第三种RPC，用来在服务器之间传递快照。</p>
+<h4 id="选举逻辑"><a href="#选举逻辑" class="headerlink" title="选举逻辑"></a>选举逻辑</h4><ol>
+<li>刚开始所有节点都是Follower</li>
+<li>Follower在选举定时器超时前没有收到任何RPC则转换为Candidate进行选举，自增一个任期号Term，每个任期的每个节点只有一票有效</li>
+<li>Candidate发送RequestVote给其他节点请求票决，Candidate会把自己的票投给自己</li>
+<li>如果有过半的服务器投了自己，则Candidate转为Leader</li>
+<li>Leader定时向集群中其他节点发送心跳Headerbeat来维护自己Leader的地位</li>
+</ol>
+<h4 id="状态机角色转换的情况"><a href="#状态机角色转换的情况" class="headerlink" title="状态机角色转换的情况"></a>状态机角色转换的情况</h4><ol>
+<li><p><strong>Follower</strong></p>
+<p>——&gt; Candidate：</p>
+<p>​		选举定时器超时前没有收到任何RPC</p>
+</li>
+<li><p><strong>Candidate</strong></p>
+<p>——&gt; Follower：</p>
+<p>​		收到Leader心跳，并且Leader的Term <strong>&gt;&#x3D;</strong> 当前节点Term；</p>
+<p>​		收到任意RPC（比如票决），并且RPC请求中携带的Term <strong>&gt;</strong> 当前节点Term</p>
+<p>——&gt; Leader：</p>
+<p>​		发送的票决请求被过半服务器赞成（大于1&#x2F;2）</p>
+</li>
+<li><p><strong>Leader</strong></p>
+<p>——&gt; Follower：</p>
+<p>​		收到任意RPC的参数中Term <strong>&gt;</strong> 当前Term</p>
+</li>
+</ol>
+<p>问题：warning: term changed even though there were no failures</p>
+<p>解决：如果出现网络正常但是又进行了选举，那就是Leader发送完心跳包后Follower没有重置自己的选举器，导致又一次选举的发生，在发送心跳包的方法里更改就可以。</p>
+<h3 id="Log-一致"><a href="#Log-一致" class="headerlink" title="Log 一致"></a>Log 一致</h3><p>过半就推进index，不过半旧后撤步</p>
+<h3 id="每个角色需要处理的方法"><a href="#每个角色需要处理的方法" class="headerlink" title="每个角色需要处理的方法"></a>每个角色需要处理的方法</h3><h4 id="Leader"><a href="#Leader" class="headerlink" title="Leader"></a>Leader</h4><p>Leader任务就是发送心跳，发送AppendEntries，并且检查自己的任期号是不是比目标的任期号小，如果小于目标任期号就转为Follower。</p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2023-07-10</span><i class="fa fa-tag"></i></div></div></div></div><div class="share"><div class="evernote"><a class="fa fa-bookmark" href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank"></a></div><div class="weibo"><a class="fa fa-weibo" href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));"></a></div><div class="twitter"><a class="fa fa-twitter" target="_blank" rel="noopener" href="http://twitter.com/home?status=,http://example.com/2023/07/10/devlog-raft-kv/,Minho hooooo.,开发日志 —— Raft-KV,;"></a></div></div><div class="pagination"><ul class="clearfix"><li class="next pagbuttons"><a class="btn" role="navigation" href="/2023/06/28/distributed-04-raft/" title="分布式共识算法 —— Raft">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author"><title>开发日志 —— Springlet · Minho hooooo.</title><meta name="description" content="IoC容器ResourceResolver创建一个IoC容器首先要解决的问题就是，获取需要加载的Class。也就是要加载@ComponentScan指定的包下所有Class，用于后面创建Bean。
+首先，Java的ClassLoader机制是不能根据包名直接获得该包下所有类的，那么就需要在class"><meta name="keywords"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">Minho hooooo.</a></h3></div></div><ul class="social-links"></ul><div class="footer"><a target="_blank" href="/"><span>Theme by </span></a><a target="_blank" rel="noopener" href="https://www.caicai.me"> CaiCai </a><span>&</span><a target="_blank" rel="noopener" href="https://github.com/Ben02/hexo-theme-Anatole"> Ben</a><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/links">友链</a></li></div><div class="information"><div class="back_btn"><li><a class="fa fa-chevron-left" onclick="window.history.go(-1)"> </a></li></div><div class="avatar"><img></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>开发日志 —— Springlet</a></h3></div><div class="post-content"><h1 id="IoC容器"><a href="#IoC容器" class="headerlink" title="IoC容器"></a>IoC容器</h1><h2 id="ResourceResolver"><a href="#ResourceResolver" class="headerlink" title="ResourceResolver"></a>ResourceResolver</h2><p>创建一个IoC容器首先要解决的问题就是，获取需要加载的Class。也就是要加载@ComponentScan指定的包下所有Class，用于后面创建Bean。</p>
+<p>首先，Java的ClassLoader机制是不能根据包名直接获得该包下所有类的，那么就需要在classpath下扫描指定包名下的所有Class，具体来说就是获得所有.class文件的路径+文件名，替换成 xyz.xminao.Hello 这样的全类名。</p>
+<p>怎么扫的？</p>
+<p>实现很简单，先抽象出一个Resource，用来表示扫描的文件。</p>
+<p>定义一个接收Funtion参数的函数，函数输入是一个Resource，输出一个泛型类型。</p>
+<ol>
+<li>获取ClassLoader，以得到classpath，这里要区分JVM提供的ClassLoader和Web应用的Servlet提供的ClassLoader扫描的地方是不一样的，具体来说通过Thread.getContextClassLoader就可以获得对应的ClassLoader。</li>
+<li>根据ClassLoader获取对应包的目录，如果是file就在目录中搜索，如果是jar包就在包内搜索。</li>
+</ol>
+<p>这样就得到了一个根据包名返回对应包内所有文件的解析类。</p>
+<h2 id="PropertyResolver"><a href="#PropertyResolver" class="headerlink" title="PropertyResolver"></a>PropertyResolver</h2><p>接下来解决配置文件的加载，也就是application.yml这样的配置文件加载。</p>
+<p>实现一个PropertyResolver，配置解析类，支持三种查询：</p>
+<ol>
+<li>普通key查询，比如getProperty(“abc.xyz”)</li>
+<li>带格式的查询，一般用来@Value注入，比如@Value(“${abc.xyz}”)</li>
+<li>带默认值的查询，比如${abc.xyz:default}格式的</li>
+</ol>
+<p>首先确定用什么存储配置，用key-value结构的Map就很合适，Map&lt;String, String&gt;存储。</p>
+<ol>
+<li>存入系统变量</li>
+<li>把传进来的Properties也存进去</li>
+</ol>
+<p>接下来要实现获取配置，定义一个getProperty方法。</p>
+<p>普通的获取可以直接Map的get返回，带格式的需要解析，先抽象出一个PropertyExpr，存储key和默认值。</p>
+<ol>
+<li>判断首尾格式是否符合</li>
+<li>是不是带默认值，这里直接判断有没有 : 就可以</li>
+<li>有默认值就存储key和对应默认值</li>
+<li>没有默认值的直接存储key和null</li>
+<li>解析完成后得到一个PropertyExpr</li>
+</ol>
+<p>getProperty需要能解析带格式查询</p>
+<ol>
+<li><p>使用PropertyExpr解析</p>
+</li>
+<li><p>如果解析出来null，就是不带格式</p>
+</li>
+<li><p>解析出来的非null，就是带格式，需要进一步判断是否有默认值</p>
+<p>3.1 带默认值的，如果配置集合中没有或者没设置value，直接返回默认值，否则返回设置的value</p>
+<p>3.2 不带默认值的，直接用 getRequiredProperty获取配置，没有对应配置直接报错</p>
+</li>
+</ol>
+<p>最后考虑@Value注入需要支持带类型注入，比如boolena、int、long等，需要一个带类型查询的方法：</p>
+<p>getProperty(String key, Class<T> targetType)，方法中要把获取到的value转换类型，转换的方法使用函数式接口，从String转换为指定类型就很方便。不过需要初始化PropertyResolver时定义转换器集合，方便转换时获取。</p>
+<p>实现支持yaml文件，就需要定义一个YamlUtil工具类，把yaml文件的配置读取成Map，Key就是完整路径，value就是value。相当于成了一个properties格式，用yaml就直接定义一个Properties，然后用putAll把Map传进去，再使用PropertyResolver解析，也就是不需要修改PropertyResolver文件。</p>
+<p>这里直接用SnakeYaml读取。</p>
+<h2 id="BeanDefinition"><a href="#BeanDefinition" class="headerlink" title="BeanDefinition"></a>BeanDefinition</h2><h3 id="数据结构"><a href="#数据结构" class="headerlink" title="数据结构"></a>数据结构</h3><h4 id="设计思路"><a href="#设计思路" class="headerlink" title="设计思路"></a>设计思路</h4><p>​	IoC容器的核心功能是管理（即Bean的生命周期都是它负责）并配置Bean，并且本项目的Bean只支持单命名、单例模式，但不代表可以直接用一个Map&lt;Name, Object&gt;来保存所有的Bean，因为这会丢失一堆定义信息，包括加载顺序、是否Primary、init&#x2F;destory方法等，所以需要抽象出一个Bean定义类型：BeanDefiniton。</p>
+<p>​	Bean的定义信息包含：Bean名称，声明类型，Bean实例，构造方法，工厂方法，加载顺序，是否Primary，初始化方法，销毁方法。</p>
+<p>​	使用一个Map&lt;String, BeanDefinition&gt;来保存所有的Bean。</p>
+<h4 id="创建的BeanDefinition类型"><a href="#创建的BeanDefinition类型" class="headerlink" title="创建的BeanDefinition类型"></a>创建的BeanDefinition类型</h4><p>​	Bean又分为两类：</p>
+<ol>
+<li><p>自定义的带@Component注解的Bean：</p>
+<p>获取Class类型（作为Bean的Class类型），获取构造方法创建Bean实例，收集@PostConstructor和@PreDestory方法，以及加载顺序，Primary等定义。</p>
+</li>
+<li><p>@Configuration注解定义的@Bean方法的Bean（第三方Bean）：</p>
+<p>@Configuration标注的类是配置类，其中@Bean标注的是Bean的工厂方法，方法的返回值作为Bean的Class类型，方法本身是创建Bean的factoryMethod，同样要收集一些Bean的定义信息。</p>
+</li>
+</ol>
+<p>Bean的声明类型和实例类型是不一定相同的，如果是@Component自定义的Bean，声明类型和实例类型就是相同的。但@Bean工厂方法创建的Bean声明类型可能和实例类型可能不是相同的，因为实例类型可能是声明类型的子类（考虑多态）。但实例类型不需要存储，只需要通过实例getClass()获取就可以。</p>
+<h4 id="查找BeanDefinition的方法"><a href="#查找BeanDefinition的方法" class="headerlink" title="查找BeanDefinition的方法"></a>查找BeanDefinition的方法</h4><p>可以想到有两种方法查找：</p>
+<ol>
+<li><p>按照名字查找</p>
+<p>也就是通过一个Map&lt;String, BeanDefinition&gt;查找，<strong>要么拿到唯一的实例要么不存在</strong>。</p>
+</li>
+<li><p>按照类型查找</p>
+<p>这就没办法通过Map&lt;Class, BeanDefinition&gt;查找，因为多态的缘故，声明类型和实例类型不一定相同。</p>
+<p>比如：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 注：AtomicInteger是Number的子类</span></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">AppConfig</span> &#123;</span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    AtomicInteger <span class="title function_">counter</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">AtomicInteger</span>();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    Number <span class="title function_">bigInt</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">BigInteger</span>(<span class="string">&quot;100000000&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果通过getBean(AtomicInteger.class)是可以获得counter()方法创建的唯一实例的。</p>
+<p>如果调用getBean(Number.class)，那么counter()和bigInt()方法创建的实例都符合，这种情况下就要通过@Primary标注选择返回的Bean，@Primary在符合类型的Bean中唯一标注，否则抛出异常。</p>
+<p>所以，通过getBean(Class)获取符合的BeanDefintion，需要找出所有符合条件的BeanDefinition，然后进一步判断得到结果。</p>
+<p>根据Class类型查找BeanDefinition具体实现：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1. 先根据Class类型找出所有符合的BeanDefintion，0或多个</span></span><br><span class="line">List&lt;BeanDefinition&gt; <span class="title function_">findBeanDefinitions</span><span class="params">(Class&lt;?&gt; type)</span> &#123;</span><br><span class="line">    在BeanDefition的Map集合里通过isAssignableFrom过滤</span><br><span class="line">	...	</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 2. 根据Class找出某个BeanDefinition，不存在就返回null，存在多个就返回@Priamry标注的</span></span><br><span class="line"><span class="meta">@Nullable</span></span><br><span class="line"><span class="keyword">public</span> BeanDefinition <span class="title function_">findBeanDefition</span><span class="params">(Class&lt;?&gt; type)</span> &#123;</span><br><span class="line">    先调用上面的findBeanDefitions找出所有符合的</span><br><span class="line">    <span class="number">1.</span> 没有符合的就返回<span class="literal">null</span></span><br><span class="line">    <span class="number">2.</span> 有一个符合的就返回唯一一个</span><br><span class="line">    <span class="number">3.</span> 有多个符合的找<span class="meta">@Primary</span></span><br><span class="line">        <span class="number">3.1</span> <span class="meta">@Primary</span>唯一，直接返回</span><br><span class="line">        <span class="number">3.2</span> 不唯一或者不存在，报错</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<p>BeanDefinition的数据结构已经定义好，接下来就是获取BeanDefinition过程</p>
+<h3 id="获取BeanDefinition过程"><a href="#获取BeanDefinition过程" class="headerlink" title="获取BeanDefinition过程"></a>获取BeanDefinition过程</h3><p>分两步：</p>
+<ol>
+<li>扫描获取所有指定包下所有的Class全类名（包括jar文件）</li>
+<li>根据扫描的Class创建BeanDefinition</li>
+</ol>
+<h4 id="扫描指定包下所有的Class全类名"><a href="#扫描指定包下所有的Class全类名" class="headerlink" title="扫描指定包下所有的Class全类名"></a>扫描指定包下所有的Class全类名</h4><p>定义一个scanForClassNames(Class)方法，获取指定包下所有的Class全类名。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Set&lt;String&gt; <span class="title function_">scanForClassNames</span><span class="params">(Class&lt;?&gt; configClass)</span> &#123;</span><br><span class="line">    <span class="number">1.</span> 获取<span class="meta">@ComponentScan</span>标注的包名，不存在就使用配置类所在类包名</span><br><span class="line">    <span class="number">2.</span> 依次扫描所有的包（<span class="meta">@ComponentScan</span>内可以有一组包名）</span><br><span class="line">        <span class="number">2.1</span> 使用ResourceResolver获取.class文件路径</span><br><span class="line">        <span class="number">2.2</span> 将路径变为全类名（替换 / \ 为 .，去掉.class后缀）</span><br><span class="line">    <span class="number">3.</span> 如果有<span class="meta">@Import</span>注解，需要将注解导入的Class也添加上</span><br><span class="line">        ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="根据注解处理扫描出的所有Class全类名（创建BeanDefinition）"><a href="#根据注解处理扫描出的所有Class全类名（创建BeanDefinition）" class="headerlink" title="根据注解处理扫描出的所有Class全类名（创建BeanDefinition）"></a>根据注解处理扫描出的所有Class全类名（创建BeanDefinition）</h4><p>定义一个createBeanDefinitions(Set<String> classNames)来根据上一步扫描到的Class全类名加载注解的Bean。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Map&lt;String, BeanDefinition&gt; <span class="title function_">createBeanDefinitions</span><span class="params">(Set&lt;String&gt; classNames)</span> &#123;</span><br><span class="line">    <span class="number">1.</span> 遍历classNames集合，挨个加载</span><br><span class="line">        <span class="number">1.1</span> 判断是否能加载</span><br><span class="line">        <span class="number">1.2</span> 判断是否是<span class="meta">@Component</span>标注</span><br><span class="line">        	<span class="number">1.2</span><span class="number">.1</span> 使用BeanDefinition构造方法创建BeanDefinition</span><br><span class="line">        	<span class="number">1.2</span><span class="number">.2</span> 如果有Configuration注解（<span class="meta">@Component</span>的子类），需要扫描其中有没有<span class="meta">@Bean</span>工厂方法来加载第三方Bean</span><br><span class="line">   	<span class="number">2.</span> 返回BeanDefinition字典</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里判断是不是@Component注解需要对类上的所有注解进行<strong>递归调用判断</strong>，因为像@Controller，@Configuration等都是@Component的子类。</p>
+<p>@Configuration注解内的@Bean方法是工厂方法，定义一个scanFactoryMethods来对指定@Configuration标注的类进行扫描，扫描出@Bean标注的工厂方法然后创建Bean。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">scanFactoryMethods</span><span class="params">(String factoryBeanName, Class&lt;?&gt; clazz, Map&lt;String, BeanDefinition&gt; defs)</span> &#123;</span><br><span class="line">	<span class="number">1.</span> 遍历指定clazz的所有方法，找出带<span class="meta">@Bean</span>标注的方法</span><br><span class="line">        <span class="number">1.1</span> 声明类型是方法的返回类型</span><br><span class="line">        <span class="number">1.2</span> 调用构造方法创建BeanDefinition</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，对于：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">xxx</span> &#123;</span><br><span class="line">	<span class="meta">@Bean</span></span><br><span class="line">	yyy <span class="title function_">method</span><span class="params">()</span> &#123;</span><br><span class="line">	</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>来说，实际创建了两个BeanDefinition：xxx本身和yyy。</p>
+<p>如果不创建xxx的实例，后续没办法调用method()来创建Bean实例。</p>
+<p>为什么在BeanDefinition中同时存储init&#x2F;destory的方法名和方法体？</p>
+<p>因为通过@Component定义的Bean根据@PostConstruct和@PreDestory可以直接拿到Method方法本身；</p>
+<p>而通过@Bean声明的Bean没办法拿到Method方法本身，只能从@Bean注解内提取出方法的字符串，后续通过反射调用，所以一个BeanDefinition的init&#x2F;destory中方法和方法名总有一个是null。</p>
+<p>现在我们就完成了所有BeanDefitnion的创建，但是BeanDefinition的instance还是空的，接下来就需要创建真正的Bean。</p>
+<h2 id="创建Bean实例"><a href="#创建Bean实例" class="headerlink" title="创建Bean实例"></a>创建Bean实例</h2><h4 id="注入模式"><a href="#注入模式" class="headerlink" title="注入模式"></a>注入模式</h4><p>因为IoC不仅要创建实例还要配置，需要考虑依赖注入。</p>
+<p>Spring支持四种注入模式：</p>
+<ol>
+<li><p>构造方法注入</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Hello</span>() &#123;</span><br><span class="line">    JdbcTemplate jdbcTemplate;</span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">Hello</span><span class="params">(<span class="meta">@Autowired</span> JdbcTemplate jdbcTemplate)</span> &#123;</span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>@Bean工厂方法注入</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">AppConfig</span>() &#123;</span><br><span class="line">	<span class="meta">@Bean</span></span><br><span class="line">	Hello <span class="title function_">hello</span><span class="params">(<span class="meta">@Autowired</span> JdbcTemplate jdbcTemplate)</span> &#123;</span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+</li>
+<li><p>Setter注入</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line">poblic <span class="keyword">class</span> <span class="title class_">Hello</span>() &#123;</span><br><span class="line">    JdbcTemplate jdbcTemplate;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">setJdbcTemplate</span><span class="params">(JdbcTemplate jdbcTemplate)</span> &#123;</span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+</li>
+<li><p>字段注入</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Hello</span>() &#123;</span><br><span class="line">	<span class="meta">@Autowired</span></span><br><span class="line">	JdbcTemplate jdbcTemplate;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+</ol>
+<p>区别在于，前两种都是强依赖，也就是创建Bean和注入依赖必须一体进行，不能分开进行。</p>
+<p>后两种是弱依赖，创建Bean之后再调用反射注入就可以，可以分两阶段进行。</p>
+<h4 id="循环依赖"><a href="#循环依赖" class="headerlink" title="循环依赖"></a>循环依赖</h4><p>循环依赖就是A,B互相依赖，或者A依赖B，B依赖C，C依赖A形成了闭环。</p>
+<p>不能解决的循环依赖：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">A</span> &#123;</span><br><span class="line">    <span class="keyword">final</span> B b;</span><br><span class="line">    A(B b) &#123; ... &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">B</span> &#123;</span><br><span class="line">    <span class="keyword">final</span> A a;</span><br><span class="line">    B(A a) &#123; ... &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>由于上面的方法是通过构造方法注入的强依赖，存在循环依赖是无解的，只能报错。</p>
+<p>可以解决的循环依赖：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">A</span> &#123;</span><br><span class="line">    B b;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">B</span> &#123;</span><br><span class="line">    A a;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">A</span> <span class="variable">a</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">A</span>();</span><br><span class="line"><span class="type">B</span> <span class="variable">b</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">B</span>();</span><br><span class="line">a.b = b;</span><br><span class="line">b.a = a;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>这种分两步，先实例化Bean再注入依赖就可以解决。</p>
+<h4 id="Bean创建的过程"><a href="#Bean创建的过程" class="headerlink" title="Bean创建的过程"></a>Bean创建的过程</h4><p>我们之前已经获得了所有的BeanDefinition，接下里要创建Bean实例，对于IoC容器来说，创建Bean分为两步：</p>
+<ol>
+<li>创建Bean的实例同时必须注入强依赖，需要关心循环依赖</li>
+<li>进行Setter注入和字段注入这些弱注入，不需要关心循环依赖</li>
+</ol>
+<h5 id="创建Bean并注入强依赖："><a href="#创建Bean并注入强依赖：" class="headerlink" title="创建Bean并注入强依赖："></a>创建Bean并注入强依赖：</h5><p>先解决循环依赖的问题，解决办法就是创建一个Set跟踪当前正在创建的所有BeanName，定义一个createBeanAsEarlySingleton来根据BeanDefinition实现创建Bean，这个方法只进行Bean创建和强依赖注入。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> Object <span class="title function_">createBeanAsEarlySingleton</span><span class="params">(BeanDefition def)</span> &#123;</span><br><span class="line">    <span class="comment">// 检测循环依赖</span></span><br><span class="line">    <span class="keyword">if</span> (!<span class="built_in">this</span>.createBeanNames.add(def.getName())) &#123;</span><br><span class="line">        <span class="comment">// 没添加成功，也就是出现循环依赖，要报错</span></span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<p>@Configuration的Bean是工厂，需要先通过createBeanAsEarlySingleton创建Bean，再创建其他普通的Bean。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// AnnotationConfigApplicationContext</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="title function_">AnnotationConfigApplicationContext</span><span class="params">(Class&lt;?&gt; configClass, PropertyResolver propertyResolver)</span> &#123;</span><br><span class="line">    <span class="number">1.</span> 扫描并创建所有的BeanDefinition</span><br><span class="line">   </span><br><span class="line">   	<span class="number">2.</span> 创建一个Set用来检测循环依赖</span><br><span class="line">   </span><br><span class="line">   	<span class="number">3.</span> 先创建<span class="meta">@Configuration</span>类型的Bean</span><br><span class="line">        </span><br><span class="line">    <span class="number">4.</span> 创建其他普通的bean（判断instance == <span class="literal">null</span>，也就是没创建实例的再创建）</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<p>接下里要补充createBeanAsEarlySingleton（创建实例的方法）</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> Object <span class="title function_">createBeanAsEarlySingleton</span><span class="params">(BeanDefition def)</span> &#123;</span><br><span class="line">    <span class="number">1.</span> 检测循环依赖</span><br><span class="line">    <span class="keyword">if</span> (!<span class="built_in">this</span>.createBeanNames.add(def.getName())) &#123;</span><br><span class="line">        <span class="comment">// 没添加成功，也就是出现循环依赖，要报错</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="number">2.</span> 判断创建的方式：构造方法或工厂方法</span><br><span class="line">    自定义的就通过构造方法直接创建，第三方的就要根据<span class="meta">@Bean</span>定义的工厂方法创建</span><br><span class="line">        </span><br><span class="line">  	<span class="number">3.</span> 获取构造方法或者工厂方法的参数</span><br><span class="line">        <span class="number">3.1</span> 获取<span class="meta">@Value</span>注解和<span class="meta">@Autowired</span>的注解</span><br><span class="line">        	参数是<span class="meta">@Value</span>注解的就用PropertyResolver填充</span><br><span class="line">        	参数是<span class="meta">@Autowired</span>注解的就找实例注入，没有的就查找BeanDefinition创建后注入（这里有递归调用createBeanAsEarlySingleton）</span><br><span class="line">    </span><br><span class="line">  	<span class="number">4.</span> 根据设置的参数，反射创建实例，同时要更新对应的BeanDefinition</span><br><span class="line">        </span><br><span class="line">    <span class="number">5.</span> 返回实例</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>现在已经创建完Bean，并且完成了强依赖的注入，接下来就要进行弱依赖注入并且调用init方法完成初始化</p>
+<h2 id="初始化Bean"><a href="#初始化Bean" class="headerlink" title="初始化Bean"></a>初始化Bean</h2><h3 id="弱依赖注入"><a href="#弱依赖注入" class="headerlink" title="弱依赖注入"></a>弱依赖注入</h3><p>首先进行若依赖注入，也就是通过Setter方法和字段完成注入。</p>
+<p>遍历所有的BeanDefinition挨个进行注入就可以</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// AnnotationConfigApplicationContext</span></span><br><span class="line"><span class="built_in">this</span>.beans.values().forEach(</span><br><span class="line">	def -&gt; injectBean(def)</span><br><span class="line">)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>先定义一个injectBean(BeanDefinition def)，用于获取Bean的原始实例进行注入。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">injectBean</span><span class="params">(BeanDefinition def)</span> &#123;</span><br><span class="line">    <span class="number">1.</span> 获取原始实例</span><br><span class="line">    <span class="number">2.</span> 对原始实例注入</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>定义一个injectProperties用于对指定的实例进行注入</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">injectProperties</span><span class="params">()</span> &#123;</span><br><span class="line">	<span class="number">1.</span> 遍历所有方法，进行setter注入</span><br><span class="line">    <span class="number">2.</span> 遍历所有字段，进行字段注入</span><br><span class="line">    <span class="number">3.</span> 递归，对父类中需要注入的注入，有些父类的注入子类也可以使用</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>定义一个tryInjectProperties对指定的实例的方法或字段进行注入</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">tryInjectProperties</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="number">1.</span> 获取字段或方法的<span class="meta">@Value</span>/<span class="meta">@Autowired</span>注解，如果都没有意味字段/方法着不需要注入，直接结束</span><br><span class="line">    </span><br><span class="line">    <span class="number">2.</span> 判断字段/方法是否可以合法注入</span><br><span class="line">        </span><br><span class="line">    <span class="number">3.</span> <span class="meta">@Value</span>注入就直接调用propertyResolver，<span class="meta">@Autowired</span>注入要获取对应的Bean</span><br><span class="line">        </span><br><span class="line">    <span class="number">4.</span> 使用反射填充字段/调用方法</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<h3 id="调用init方法"><a href="#调用init方法" class="headerlink" title="调用init方法"></a>调用init方法</h3><p>弱依赖注入完直接再遍历一遍BeanDefinition调用init方法，完成最后的初始化。</p>
+<p>现在就完成了一个基本的IoC容器，可以扫描Class全类名、创建BeanDefinition、创建并配置Bean实例、初始化Bean。</p>
+<p>但Spring提供了BeanPostProcessor接口，用于替换Bean，比如可以用作代理。</p>
+<h2 id="BeanPostProcessor"><a href="#BeanPostProcessor" class="headerlink" title="BeanPostProcessor"></a>BeanPostProcessor</h2><p>举一个例子：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">AppConfig</span> &#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="keyword">public</span> LocalDateTime <span class="title function_">localDateTime</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> LocalDateTime.now();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    BeanPostProcessor <span class="title function_">replaceLocalDateTime</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Beanprocessor</span>() &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="keyword">public</span> Object <span class="title function_">postProcessBeforeInitialization</span><span class="params">(Ojbect bean, String beanName)</span> <span class="keyword">throws</span> BeansException &#123;</span><br><span class="line">                <span class="keyword">if</span> (bean <span class="keyword">instanceof</span> LocalDateTime) &#123;</span><br><span class="line">                    <span class="keyword">return</span> ZonedDateTime.now();</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">return</span> bean;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>这样就可以通过BeanPostProcessor替换LocalDateTime为ZonedDateTime。</p>
+<p>实际应用中可以使用BeanPostProcessor实现代理功能，也就是用代理Bean替换原来的Bean实现增强。</p>
+<p>但会出现一个问题：注入给哪个实例？</p>
+<h3 id="注入给哪个实例？"><a href="#注入给哪个实例？" class="headerlink" title="注入给哪个实例？"></a>注入给哪个实例？</h3><p>现在有一个UserService，依赖JdbcTemplate；一个MvcController，依赖于UserService。</p>
+<p>交给容器管理，那么现在有的Bean包括：JdbcTemplate、UserService、MvcController</p>
+<p>如果我对UserService通过BeanPostProcessor进行代理增强，</p>
+<p>那么现在有的Bean包括：JdbcTemplate、UserServiceProxy、MvcController。</p>
+<p>那么JdbcTemplate注入给谁？</p>
+<p>从业务逻辑上讲，必须注入给被代理的UserService实例，因为代理实例需要调用被代理实例完成业务方法。</p>
+<p>那么MvcController需要被注入UserService，要注入哪个？</p>
+<p>从业务逻辑上讲，必须注入UserServiceProxy，否则无法进行增强。</p>
+<p>这就导致引入BeanPostProcessor让依赖注入变得复杂，可以得出结论如下：</p>
+<ol>
+<li>一个Bean如果被Proxy替换，则依赖它的Bean应该注入Proxy。</li>
+<li>一个Bean如果被Proxy替换，如果要注入依赖，则要注入给原始对象（被代理对象）。</li>
+</ol>
+<h4 id="注入Proxy"><a href="#注入Proxy" class="headerlink" title="注入Proxy"></a>注入Proxy</h4><p>实现替换后，依赖它的注入Proxy，只需要创建完Bean后，立刻调用BeanPostProccessor就可以实现。后续依赖它的Bean引用的就都是Proxy了。</p>
+<p>具体实现：</p>
+<p>首先要在创建配置类Bean之后，普通Bean之前创建BeanPostProcessor类型的Bean</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// AnnotationConfigApplicationContext</span></span><br><span class="line"><span class="keyword">public</span> <span class="title function_">AnnotationConfigApplicationContext</span><span class="params">()</span> &#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="number">1.</span> 创建<span class="meta">@Configuration</span>类型的Bean</span><br><span class="line">        </span><br><span class="line">    <span class="number">2.</span> 创建BeanPostProcessor类型的Bean</span><br><span class="line">        </span><br><span class="line">    <span class="number">3.</span> 创建其他普通的Bean</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>接着在创建实例的方法createBeanAsEarlySingleton中<strong>创建Bean实例后，就调用BeanPostProcessor类型的Bean进行处理。</strong>也就是遍历所有BeanPostProcessor处理Bean</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// AnnotationConfigApplicationContext</span></span><br><span class="line"><span class="keyword">public</span> Object <span class="title function_">createBeanAsEarlySingleton</span><span class="params">()</span> &#123;</span><br><span class="line">	<span class="number">1.</span> 根据构造方法/工厂方法创建实例并解决强依赖问题</span><br><span class="line">        </span><br><span class="line">    <span class="number">2.</span> 调用BeanPostProcessor处理Bean</span><br><span class="line">        具体就是遍历所有已经创建的BeanPostProcessor，如果一个BeanPostProcessor中替换了原始Bean，就更新BeanDefinition中的引用</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="原始Bean去哪了？"><a href="#原始Bean去哪了？" class="headerlink" title="原始Bean去哪了？"></a>原始Bean去哪了？</h4><p>这里有一个问题，我如果要对原始Bean注入，原始Bean呢？</p>
+<p>原始Bean被BeanPostProcessor丢掉了。</p>
+<p>为了解决对原始Bean的注入问题，需要在替换Bean的BeanPostProcessor中保存原始的Bean。</p>
+<p>具体来说，在BeanPostProcessor中添加一个postProcessOnSetProperty方法，用来获得原始Bean。</p>
+<p>所以就需要更改injectBean的流程，</p>
+<p>先定义一个getProxiedInstance(BeanDefinition)方法获取原始Bean</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Object <span class="title function_">getProxiedInstance</span><span class="params">(BeanDefinition def)</span> &#123;</span><br><span class="line">   	<span class="number">1.</span> 获取BeanDefinition中的实例</span><br><span class="line">        </span><br><span class="line">    <span class="number">2.</span> 倒序遍历BeanPostProcessor，一步一步还原判断是否被代理，最后获得最原始的实例</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>在injectBean中，Bean的实例要调用getProxiedInstance来获取原始对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">injectBean</span><span class="params">(def)</span> &#123;</span><br><span class="line">    <span class="number">1.</span> 获取原始Bean实例</span><br><span class="line">        </span><br><span class="line">    <span class="number">2.</span> 对原始实例进行注入</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<p>强注入依赖不存在第二个问题，也就是要注入依赖，却注入给Proxy。因为在创建bean的流程中，首先解决强注入依赖，一定会先注入给原始对象，之后才会替换为BeanPostProcessor替换的Bean。</p>
+<p>而弱依赖就不是了，所有的Bean已经创建完成，被替换的都被替换，就要考虑注入给原始实例还是Proxy的问题。</p>
+<h2 id="完成IoC容器"><a href="#完成IoC容器" class="headerlink" title="完成IoC容器"></a>完成IoC容器</h2><p>最后需要提取接口</p>
+<h3 id="给用户使用的ApplicationContext接口"><a href="#给用户使用的ApplicationContext接口" class="headerlink" title="给用户使用的ApplicationContext接口"></a>给用户使用的ApplicationContext接口</h3><p>包含各种getBean方法，以及判断Bean是否存在等</p>
+<h3 id="给框架级别使用的ConfigurableApplicationContext"><a href="#给框架级别使用的ConfigurableApplicationContext" class="headerlink" title="给框架级别使用的ConfigurableApplicationContext"></a>给框架级别使用的ConfigurableApplicationContext</h3><p>包含各种获取BeanDefinition的方法。</p>
+<p>参考Spring的接口，让AnnotationConfigApplicationContext实现ConfigurationApplicationContext接口，</p>
+<p>让ConfigurableApplicationContext实现ApplicationContext接口。</p>
+<h1 id="AOP"><a href="#AOP" class="headerlink" title="AOP"></a>AOP</h1><p>面向切面编程，本质就是一个Proxy模式，可以让IoC容器运行时再组合，而不是把Proxy写死，实现Proxy模式的核心就是对目标Bean方法的拦截，也就是说，实现原理就是方法拦截。</p>
+<p>所以AOP实现方式：</p>
+<ol>
+<li><p>编译期</p>
+<p>让编译器把切面调用编译进字节码，不过需要拓展编译器，AspectJ就是拓展了Java编译器，使用aspect关键字织入</p>
+</li>
+<li><p>类加载器</p>
+<p>目标类加载到JVM之后，通过一个特殊的类加载器，对目标字节码进行增强</p>
+</li>
+<li><p>运行期</p>
+<p>目标对象和切面都是Java类，通过JVM的动态代理活着三方类库运行期动态织入</p>
+</li>
+</ol>
+<p>最简单的是方式3，不涉及到JVM底层，实现方式也分两种：</p>
+<ol>
+<li>使用JDK的动态代理，不过支持接口代理，不能对具体类实现代理</li>
+<li>使用CGLIB等三方库，动态生成字节码，可以对具体类实现代理</li>
+</ol>
+<p>Spring<strong>实现代理</strong>中，如果Bean<strong>声明的类型</strong>是接口，就直接使用JDK动态代理实现。如果Bean声明类型是Class，那就使用CGLIB动态生成字节码实现代理。</p>
+<p>Spring<strong>定义代理</strong>，提供两种方式：</p>
+<ol>
+<li>用AspectJ语法的表达式定义AOP，比如 <code>execution(public * xyz.xminao.*.*(..))</code></li>
+<li>注解定义AOP，比如@Transactional表示开启事务</li>
+</ol>
+<p>用表达式容易漏掉，而且范围不好控制。本项目只支持注解模式的AOP机制，而且用动态生成字节码的方式实现。</p>
+<p>由于CGLIB已经不维护了，用ByteBuddy。</p>
+<h2 id="实现ProxyResolver"><a href="#实现ProxyResolver" class="headerlink" title="实现ProxyResolver"></a>实现ProxyResolver</h2><p>上面已经提到，我们选择运行期用ByteBuddy动态生成字节码的方式<strong>实现代理</strong>，用注解方式<strong>定义代理</strong>。</p>
+<p>实现代理需要提供两个Bean：</p>
+<ol>
+<li>原始Bean，也就是被代理的Bean</li>
+<li>拦截器，拦截目标Bean方法后，自动调用拦截器实现代理功能</li>
+</ol>
+<p>拦截器需要自定义接口，这里直接用Java标准库的InvocationHandler，不需要自定义接口。</p>
+<p>如果我们现在已经有了原始Bean和实现InvocationHandler的拦截器Bean，就可以编写一个ProxyResolver实现AOP代理。</p>
+<p>ByteBuddy官网提供了相关代码，大致流程如下：</p>
+<ol>
+<li>传入原始的Bean和拦截器</li>
+<li>动态创建一个Proxy的Class</li>
+<li>拦截所有public方法（创建匿名拦截器实例）</li>
+<li>生成并加载字节码</li>
+<li>生成Proxy实例</li>
+</ol>
+<p>InvocationHandler的外层invoke传入Object时Proxy实例，内层的invoke调用转发至原始Bean</p>
+<p>这就可以实现AOP了，举一个例子：定义一个@Polite注解，被增强的方法返回值前后添加新字符串。</p>
+<p>首先定义一个注解Polite</p>
+<p>定义一个被代理的Bean</p>
+ <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">OriginBean</span> &#123;</span><br><span class="line">	<span class="keyword">public</span> String name;</span><br><span class="line">	</span><br><span class="line">	<span class="meta">@Polite</span></span><br><span class="line">	<span class="keyword">public</span> String <span class="title function_">hello</span><span class="params">()</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">&quot;Hello, &quot;</span> + name + <span class="string">&quot;.&quot;</span>;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<p>首先编写一个InvocationHandler</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">PoliteInvocationHandler</span> <span class="keyword">implements</span> <span class="title class_">InvocationHandler</span> &#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> Object <span class="title function_">invoke</span><span class="params">(Object bean, Method method, Object[] args)</span> <span class="keyword">throw</span> Throwable &#123;</span><br><span class="line">        <span class="comment">// 修改标记了@Polite的方法返回值</span></span><br><span class="line">        <span class="keyword">if</span> (method.getAnnotation(Polite.class) != <span class="literal">null</span>) &#123;</span><br><span class="line">            <span class="type">String</span> <span class="variable">ret</span> <span class="operator">=</span> (String) method.invoke(bean, args);</span><br><span class="line">            <span class="keyword">if</span> (ret.endWith(<span class="string">&quot;.&quot;</span>))) &#123;</span><br><span class="line">                ret = ret.substring(<span class="number">0</span>, ret.length() - <span class="number">1</span>) + <span class="string">&quot;!&quot;</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> ret;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 返回原始方法返回值</span></span><br><span class="line">        <span class="keyword">return</span> method.invoke(bean, args);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<p>测试代码</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">OriginBean</span> <span class="variable">origin</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">OriginBean</span>();</span><br><span class="line">origin.name = <span class="string">&quot;Bob&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 创建Proxy</span></span><br><span class="line"><span class="type">OriginBean</span> <span class="variable">proxy</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ProxyResolver</span>.createProxy(origin, <span class="keyword">new</span> <span class="title class_">PoliteInvocationHandler</span>());</span><br><span class="line"></span><br><span class="line">sout(origin.hello())</span><br><span class="line">sout(proxy.hello())</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+
+
+<h2 id="实现Around"><a href="#实现Around" class="headerlink" title="实现Around"></a>实现Around</h2><p>已经完成<strong>代理实现</strong>，接下来就是<strong>定义代理</strong></p>
+<p>装配AOP的步骤：、</p>
+<p>首先定义一个原始Bean</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="meta">@Around(&quot;aroundInvocationHandler&quot;)</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">OriginBean</span>() &#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Value(&quot;$&#123;customer.name&#125;&quot;)</span></span><br><span class="line">    <span class="keyword">public</span> String name;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Polte</span></span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">hello</span><span class="params">()</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">&quot;Hello, &quot;</span> + name + <span class="string">&quot;.&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其中@Around注解的值 aroundInvocationHandler要指出按照什么名字查找拦截器（也是一个bean），客户端再定义一个AroundInvocationHandler</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">AroundInvocationHandler</span> <span class="keyword">implements</span> <span class="title class_">InvocationHandler</span> &#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> Object <span class="title function_">invoke</span><span class="params">(Object proxy, Method method, Object[] args)</span> <span class="keyword">throw</span> Throwable &#123;</span><br><span class="line">        <span class="keyword">if</span> (method.getAnnotaion(Polite.class) != <span class="literal">null</span>) &#123;</span><br><span class="line">            <span class="type">String</span> <span class="variable">ret</span> <span class="operator">=</span> (String) method.invoke(proxy, args);</span><br><span class="line">            <span class="keyword">if</span> (ret.endWith(<span class="string">&quot;.&quot;</span>)) &#123;</span><br><span class="line">                ret = ret.substring(<span class="number">0</span>, ret.length() - <span class="number">1</span>) + <span class="string">&quot;!&quot;</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> ret;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 调用原始方法</span></span><br><span class="line">        <span class="keyword">return</span> method.invoke(proxy, args);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>现在有了原始Bean和拦截器，需要IoC容器进行AOP装配。</p>
+<p>怎么实现AOP装配？使用之前实现的BeanPostProcessor，实现 一个AroundBeanPostProcessor。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">AroundProxyBeanPostProcessor</span> <span class="keyword">implements</span> <span class="title class_">BeanPostProcessor</span> &#123;</span><br><span class="line">	<span class="number">1.</span> 定义一个Map存储原始Bean</span><br><span class="line">        </span><br><span class="line">    <span class="number">2.</span> 在postProcessBeforeInitialization中检测<span class="meta">@Around</span>注解，如果有就获取注解配置的拦截器bean名称吗，然后通过createProxy创建代理。</span><br><span class="line"></span><br><span class="line">        </span><br><span class="line">    <span class="number">3.</span> </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2023-03-10</span><i class="fa fa-tag"></i></div></div></div></div><div class="share"><div class="evernote"><a class="fa fa-bookmark" href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank"></a></div><div class="weibo"><a class="fa fa-weibo" href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));"></a></div><div class="twitter"><a class="fa fa-twitter" target="_blank" rel="noopener" href="http://twitter.com/home?status=,http://example.com/2023/03/10/devlog-springlet/,Minho hooooo.,开发日志 —— Springlet,;"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a class="btn" role="navigation" href="/2023/04/21/mvc-design-pattern/" title="mvc-design-pattern">上一篇</a></li><li class="next pagbuttons"><a class="btn" role="navigation" href="/2023/02/15/61bhw2/" title="CS61B HW02：Percolation">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>
