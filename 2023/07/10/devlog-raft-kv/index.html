@@ -1,14 +1,16 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author"><title>开发日志 —— Raft-KV · Minho hooooo.</title><meta name="description" content="关于RaftRaft是用来管理多副本集群日志一致性的协议，它和multi-Paxos作用相同，效率相当，但是组织结构更加简单，更容易理解，更容易实现。
-共识算法允许多台机器作为一个集群协同工作，其中某些机器故障集群也可以正常运作。
-Raft更容易理解在于它将共识算法分为了三个部分：
-
-Leader "><meta name="keywords"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">Minho hooooo.</a></h3></div></div><ul class="social-links"></ul><div class="footer"><a target="_blank" href="/"><span>Theme by </span></a><a target="_blank" rel="noopener" href="https://www.caicai.me"> CaiCai </a><span>&</span><a target="_blank" rel="noopener" href="https://github.com/Ben02/hexo-theme-Anatole"> Ben</a><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">Home</a></li><li><a href="/about">Sobre</a></li><li><a href="/archives">Arquivo</a></li><li><a href="/links">Links</a></li></div><div class="information"><div class="back_btn"><li><a class="fa fa-chevron-left" onclick="window.history.go(-1)"> </a></li></div><div class="avatar"><img></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>开发日志 —— Raft-KV</a></h3></div><div class="post-content"><h2 id="关于Raft"><a href="#关于Raft" class="headerlink" title="关于Raft"></a>关于Raft</h2><p>Raft是用来管理多副本集群日志一致性的协议，它和multi-Paxos作用相同，效率相当，但是组织结构更加简单，更容易理解，更容易实现。</p>
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author"><title>开发日志 —— Raft-KV · Minho hooooo.</title><meta name="description" content="Consensus &amp;#x2F; Consistency共识（Consensus）：描述分布式系统中多个节点之间，彼此对某个方案达成一致结果的过程；
+一致性（Consistency）：指分布式系统中多个副本对外呈现的数据状态，如顺序一致性、线性一致性，描述多个节点对数据状态的维护能力。
+可以说，一致"><meta name="keywords"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">Minho hooooo.</a></h3></div></div><ul class="social-links"></ul><div class="footer"><a target="_blank" href="/"><span>Theme by </span></a><a target="_blank" rel="noopener" href="https://www.caicai.me"> CaiCai </a><span>&</span><a target="_blank" rel="noopener" href="https://github.com/Ben02/hexo-theme-Anatole"> Ben</a><div class="by_farbox"><a href="https://hexo.io/zh-cn/" target="_blank">Proudly published with Hexo&#65281;</a></div></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/links">友链</a></li></div><div class="information"><div class="back_btn"><li><a class="fa fa-chevron-left" onclick="window.history.go(-1)"> </a></li></div><div class="avatar"><img></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>开发日志 —— Raft-KV</a></h3></div><div class="post-content"><ol>
+<li><h2 id="Consensus-x2F-Consistency"><a href="#Consensus-x2F-Consistency" class="headerlink" title="Consensus &#x2F; Consistency"></a>Consensus &#x2F; Consistency</h2><p>共识（Consensus）：描述分布式系统中多个节点之间，彼此对某个方案达成一致结果的过程；</p>
+<p>一致性（Consistency）：指分布式系统中多个副本对外呈现的数据状态，如顺序一致性、线性一致性，描述多个节点对数据状态的维护能力。</p>
+<p>可以说，一致性是<strong>结果</strong>，共识是实现一致性的一种<strong>方法</strong>。</p>
+<h2 id="关于Raft"><a href="#关于Raft" class="headerlink" title="关于Raft"></a>关于Raft</h2><p>“Raft 是一种共识算法，其设计目的是易于理解。它在容错性和性能上与 Paxos 相当。不同之处在于它被分解为相对独立的子问题，并且它干净地解决了实际系统所需的所有主要部分。我们希望 Raft 能够为更广泛的受众提供共识，并且这些更广泛的受众将能够开发出比目前可用的各种更高质量的基于共识的系统。 ” —— 来自<a target="_blank" rel="noopener" href="https://raft.github.io/">Raft协议官网</a></p>
 <p><strong>共识算法</strong>允许多台机器作为一个集群协同工作，其中某些机器故障集群也可以正常运作。</p>
 <p>Raft更容易理解在于它将共识算法分为了三个部分：</p>
 <ol>
 <li><strong>Leader Election</strong> （领导者选举）：一个Leader故障，新的Leader就要被选举出来；</li>
 <li><strong>Log Replication</strong>  （日志复制）：Leader接受到客户端的请求后，需要将Log Entry复制到其它的集群节点，强制所有节点日志和自己保持一致；</li>
-<li><strong>Safety</strong> （安全性）：安全性关键在复制状态机的安全性，只要任何一个服务器将一个特定的Log Entry应用到了自己的状态机中，那么其他服务器节点就不能在同一日志索引上存储另外一条命令。</li>
+<li><strong>Safety</strong> （安全性）：<strong>安全性关键在复制状态机的安全性，只要任何一个服务器将一个特定的Log Entry应用到了自己的状态机中，那么其他服务器节点就不能在同一日志索引上存储另外一条命令。</strong>（解决方案就是一个Leader不可以commit非自己任期的日志条目，而且一个节点想选举必须拥有所有最新的日志条目才有资格获选）</li>
 </ol>
 <p>并且Raft还包含一个用来解决变更集群成员的新机制，使用重写多数保证安全性。</p>
 <p>Raft相比于现有共识算法的新特性：</p>
@@ -16,6 +18,11 @@ Leader "><meta name="keywords"><meta content="width=device-width, initial-scale=
 <li><strong>Strong Leader</strong> （强领导性）：例如Log Entry只能从Leader流向Follower，这就简化了日志复制的管理流程；</li>
 <li><strong>Leader Election</strong> （领导选举）：Raft使用随机计数器进行领导选举，Raft在任意共识算法都需要的心跳机制（Heartbeats）上添加了少量机制就解决了很多冲突；</li>
 <li><strong>Membership changes</strong> （成员变更）：Raft在更改集群中服务器集的时候使用 <strong>Joint Consensus</strong>（联合共识）方法，在集群配置转换的时新旧配置大多是重叠的，集群的配置更改期间就可以继续正常运行。</li>
+</ol>
+<h2 id="复制状态机"><a href="#复制状态机" class="headerlink" title="复制状态机"></a>复制状态机</h2><p>共识算法一般在复制状态机的背景下实现，这种方法下，一组服务器在的状态机计算相同状态的相同副本，即使某些服务器崩溃，服务也可以正常运行。</p>
+<p>复制状态机用来解决分布式系统中的各种容错问题，比如具有单个Leader的大规模系统，通常使用单独的复制状态机管理Leader选举和保存Leader崩溃后重新选举需要的配置信息。</p>
+<p>复制状态机通常用日志复制实现，如图中的每个服务器都保存一份拥有一系列命令的日志，服务器上的状态机按照顺序执行日志中的命令，每份日志中命令相同并且顺序也相同，所以每个状态机可以处理相同的命令。所以状态机是确定的，每个状态机都执行相同的状态和相同的输出序列。</p>
+</li>
 </ol>
 <h2 id="领导者选举-Leader-Election"><a href="#领导者选举-Leader-Election" class="headerlink" title="领导者选举 (Leader Election)"></a>领导者选举 (Leader Election)</h2><h4 id="状态机角色："><a href="#状态机角色：" class="headerlink" title="状态机角色："></a>状态机角色：</h4><p>一个Raft集群中包含奇数个服务器节点，这些节点在任意一刻只能是以下三种身份之一：</p>
 <ol>
@@ -155,10 +162,111 @@ Leader "><meta name="keywords"><meta content="width=device-width, initial-scale=
 <li>第一轮：同步日志AppendEntries RPC，得到过半节点响应，Leader状态机推进，给Client返回成功</li>
 <li>第二轮：下一次AppendEntries RPC附带上一次的commitIndex，Follower收到后，apply给定Index之前的日志条目给本地状态机</li>
 </ul>
-<h3 id="实现过程"><a href="#实现过程" class="headerlink" title="实现过程"></a>实现过程</h3><h4 id="Leader将日志同步给Follower"><a href="#Leader将日志同步给Follower" class="headerlink" title="Leader将日志同步给Follower"></a>Leader将日志同步给Follower</h4><p>分为三步：</p>
+<ol>
+<li><h3 id="实现过程"><a href="#实现过程" class="headerlink" title="实现过程"></a>实现过程</h3><h4 id="Leader将日志同步给Follower"><a href="#Leader将日志同步给Follower" class="headerlink" title="Leader将日志同步给Follower"></a>Leader将日志同步给Follower</h4><p>分为三步：</p>
 <ol>
 <li>根据Leader字段中的nextIndex[]，给Follower同步日志</li>
 <li>检查日志是否已经同步给过半节点，即过半服务器响应了AppendEntries RPC，则进行commit操作</li>
 <li>更新matchIndex[]和nextIndex[]</li>
 </ol>
-</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2023-07-10</span><i class="fa fa-tag"></i></div></div></div></div><div class="share"><div class="evernote"><a class="fa fa-bookmark" href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank"></a></div><div class="weibo"><a class="fa fa-weibo" href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));"></a></div><div class="twitter"><a class="fa fa-twitter" target="_blank" rel="noopener" href="http://twitter.com/home?status=,http://example.com/2023/07/10/devlog-raft-kv/,Minho hooooo.,开发日志 —— Raft-KV,;"></a></div></div><div class="pagination"><ul class="clearfix"><li class="next pagbuttons"><a class="btn" role="navigation" href="/2023/06/28/distributed-04-raft/" title="分布式共识算法 —— Raft">Próximo post</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>
+<h4 id="Follower接收日志"><a href="#Follower接收日志" class="headerlink" title="Follower接收日志"></a>Follower接收日志</h4><p>分为两步：</p>
+<ol>
+<li>检查发来的日志是否存在冲突，存在冲突则返回success&#x3D;false即失败，等待leader再次发送调整后的日志的RPC，从协商好的位置开始覆盖为leader的日志条目</li>
+<li>检查日志是否可以提交，进行提交</li>
+</ol>
+<h4 id="提交日志"><a href="#提交日志" class="headerlink" title="提交日志"></a>提交日志</h4><p>Follower检测到日志可以提交后进行提交，提交逻辑如下：</p>
+<ol>
+<li>设置新的commitIndex</li>
+<li>将lastApplied到commitIndex之间的日志apply到状态机</li>
+</ol>
+<h4 id="选举限制"><a href="#选举限制" class="headerlink" title="选举限制"></a>选举限制</h4><p>是对选举投票增加一项日志限制，防止出现一个落后的follower恢复后选举成为新leader，覆盖后来leader的日志条目。</p>
+<p>Raft使用一个很简单的办法，保证新leader在选举时就包含之前所有任期内commit的日志条目，也就是意味着<strong>日志条目只有一个流动方向，那就是从leader到follower，leader不会覆盖本地日志已经有的条目</strong>。</p>
+<p>Raft采用投票的方式保证一个Candidate只有拥有之前所有任期已经提交的日志条目后才可以赢得选举，一个candidate如果想要赢得选举，则必须与集群中过半服务器通信并得到支持，Raft规定集群中的leader任何操作都需要过半服务器的响应支持才能操作成功，那么每一轮过半的服务器都一定至少有一个和上一轮的过半服务器重叠，也就是说每一轮的过半服务器都一定包含有最新提交日志的服务器，一旦candidate发现有一个已提交日志比自己更新的服务器，那么他就无法当选。</p>
+<p><strong>更“新”（up-to-data）的定义</strong>：</p>
+<ol>
+<li>两份日志最后条目的任期不同，那么任期号大的日志更新；</li>
+<li>两份日志最后条目的任期相同，日志条目更长的更新。</li>
+</ol>
+<h4 id="关于心跳"><a href="#关于心跳" class="headerlink" title="关于心跳"></a>关于心跳</h4><p>有数据包就是发送AppenEntries，没有就是发送心跳包。</p>
+<h4 id="关于commit和apply"><a href="#关于commit和apply" class="headerlink" title="关于commit和apply"></a>关于commit和apply</h4><p>commit是指从log从leader发送到了过半的服务器中（被过半服务器响应），这种log entry就是已经被提交的commit，Raft保证这种已经commit的log entry都是持久化的并且最终会被状态机执行，被状态机执行就是apply。leader会追踪它所知道的要commit的最高索引，并且将该索引包含在未来的AppendEntries RPC（包括心跳）中，以便followers知道这条log entry已经被commit了，可以按顺序进行apply。</p>
+<h4 id="部分总结"><a href="#部分总结" class="headerlink" title="部分总结"></a>部分总结</h4><ol>
+<li><p>一定要注意index的问题，因为第一个log的index是从1算起，数组的index第一个是0。（吗的</p>
+</li>
+<li><p>只有leader需要维护的两个变量：nextIndex[]和matchIndex[]，表示Follower的log replication的情况（下一个index和leader知道已经replication的index），leader崩溃后也需要重新初始化这两个变量（nextIndex[]初始化为leader最后一个log的index+1，matchIndex[]初始化为0。</p>
+</li>
+<li><p>follower接收到带log的AppendEntries RPC后需要检查是否冲突，通过RPC中的prevLogIndex和prevLogTerm（leader认为该follower的）来判断冲突，如果冲突需要从冲突部分开始覆盖为leader的日志。</p>
+</li>
+<li><p>新的leader的日志需要确保拥有所有已经commit的log，为了防止一个故障的follower一段时间后重新选举为leader，而又不存在曾经所有任期已经commit的日志，需要对选举进行限制，只有拥有最新commit的节点才有资格当选。即follower只给最后一条日志比自己 up-to-data 的节点投票：</p>
+<p>up-to-data:</p>
+<ul>
+<li>任期号不同，任期号大的新</li>
+<li>任期号相同，日志长的新</li>
+</ul>
+</li>
+</ol>
+<h3 id="Persistence-持久化"><a href="#Persistence-持久化" class="headerlink" title="Persistence 持久化"></a>Persistence 持久化</h3><p>保证节点故障后可以恢复状态。persist()保存Raft节点状态，readPersist()恢复之前保存的状态。</p>
+<h4 id="保存Raft节点的哪些字段"><a href="#保存Raft节点的哪些字段" class="headerlink" title="保存Raft节点的哪些字段"></a>保存Raft节点的哪些字段</h4><img src="/2023/07/10/devlog-raft-kv/07.png" class="" title="state change">
+
+<p>论文中提到要保存的字段：currentTerm, voteFor, log[]</p>
+<h4 id="保存的时机"><a href="#保存的时机" class="headerlink" title="保存的时机"></a>保存的时机</h4><p>在对应字段被修改的时候直接persist()就可以。</p>
+<h4 id="no-op-log"><a href="#no-op-log" class="headerlink" title="no-op log"></a>no-op log</h4><p>no-op log是一种只有index和term，没有command的log，具体流程就是：</p>
+<p>在leader刚当选的时候，立即追加一条no-op log，并立即复制到其他节点，no-op日志一旦commit，那么leader之前的那些未提交日志也就全部简介提交了。本质上no-op log 使得leader隐式快速提交之前任期未提交的日志，确认当前commitIndex，让系统对外快速反应。</p>
+<h4 id="Figure8"><a href="#Figure8" class="headerlink" title="Figure8"></a>Figure8</h4><p>要保证commit后的日志不能被覆盖被修改，也就是即使未提交的前任任期的日志已经复制到大多数节点，也不可以提交。Raft只在leader当期内的日志条目才通过计算peer数量提交（大于1&#x2F;2），一旦当前任期内的某条日志被以这种方式提交，那么由于 日志匹配特性（Log Matching，需要和leader的prevLog的index和term相同，一种归纳过程），之前所有日志也会被间接提交。</p>
+<p>Raft在复制之前任期的条目时，会保留原来的任期号，这种做法更容易推导出日志条目。</p>
+<h3 id="快照机制"><a href="#快照机制" class="headerlink" title="快照机制"></a>快照机制</h3><p>Raft定时触发保存快照，将部分旧的log截断保存为快照，从而节省内存，防止log无限增长。</p>
+<img src="/2023/07/10/devlog-raft-kv/08.png" class="" title="state change">
+
+<p>快照保存需要考虑：</p>
+<ol>
+<li>选择快照保存的日志范围</li>
+<li>选择快照保存的时机</li>
+<li>日志序列化为快照，精简原有日志</li>
+</ol>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Snapshot(index <span class="type">int</span>, snapshot []<span class="type">byte</span>)</span><br></pre></td></tr></table></figure>
+
+<p>index: 表示索引，从索引index往前所有的日志（包含index）就是要保存为快照的；</p>
+<p>snapshot: 已经保存好的快照数据，将日志快照按照index截断。</p>
+<p><strong>重要</strong>：这里的rf.log[0]保存快照的index和term，用于一致性检查。</p>
+<h4 id="快照同步"><a href="#快照同步" class="headerlink" title="快照同步"></a>快照同步</h4><p>由于日志被截断，当有新的follower加入的时候可能需要同步快照内的日志，Raft采用将整个快照发送的方式实现同步，快照的结构定义需要记录快照最后一个日志的Index和Term，用来作为AppendEntries RPC的一致性检验。</p>
+<p>快照RPC如下：</p>
+
+
+
+
+<h4 id="下标索引转换"><a href="#下标索引转换" class="headerlink" title="下标索引转换"></a>下标索引转换</h4><p>由于日志在保存快照时会被截断，原先的索引日志方式需要调整，从原来直接获取下标转换为两种下标：</p>
+<p>logicIndex：表示日志逻辑上的下标位置</p>
+<p>realIndex：表示实际上日志存储的下标位置</p>
+<p>计算就通过快照的lastIncludeIndex就可以。</p>
+<p>这里snapshot的lastIncludedIndex和lastIncludedTerm应该初始化为-1好像合理，因为除了一开始的index&#x3D;0日志</p>
+<h4 id="InstallSnapshot"><a href="#InstallSnapshot" class="headerlink" title="InstallSnapshot"></a>InstallSnapshot</h4><p>当leader响应给客户端的日志在快照中，则发送installSnapshotRPC</p>
+<h2 id="Key-Value-service-键值对存取服务"><a href="#Key-Value-service-键值对存取服务" class="headerlink" title="Key-Value service 键值对存取服务"></a>Key-Value service 键值对存取服务</h2><img src="/2023/07/10/devlog-raft-kv/10.jpeg" class="" title="state change">
+
+<p>分两层，Server和Client，Server层就是KVServer调用Raft来进行操作，Client就是一个实际一个Clerk调用对应操作。</p>
+<p>支持Put，Append，Get操作，Client将对应操作通过RPC发送给关联Raft为Leader的KVServer，KVServer将操作提交给下层的Raft库进行同步。</p>
+<p>Client如果不知道哪个KVServer基于Leader Raft，就会发送给非Leader Raft的KVServer，重试到找到为止。</p>
+<h3 id="过程分析"><a href="#过程分析" class="headerlink" title="过程分析"></a>过程分析</h3><ol>
+<li>KVServer收到Client的操作请求后，首先通过Start接口将操作发送给Raft层，Raft层同步给其他节点。Get也需要Start同步，为了保证客户端操作的历史一致性。</li>
+<li>Start后要等待Start结果，收到结果才能返回给Client操作是否成功</li>
+<li>由于Start操作是异步的，操作无法保证成功，需要设定一个等待时间，超时后检查是否还是leader，是则继续等待。</li>
+<li>需要增加一个Client Request Unique ID，或者说Sequence ID，保证client操作不会被重复执行。</li>
+</ol>
+<p>一个KVServer收到Client的请求后，处理流程如下：</p>
+<p>Begin ——&gt; Received Request ——&gt; Start Request ——&gt; Wait Request ——&gt; Reply Client</p>
+<h3 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h3><h4 id="Client"><a href="#Client" class="headerlink" title="Client"></a>Client</h4><p>就是For-loop知道请求完成就退出。</p>
+<ol>
+<li><p>Get</p>
+<p>通过SendGet发送回调请求给KVServer，如果请求失败就换下一个服务器重试，如果请求成功但是返回非leader错误，也要换下一个服务器重试。这里有一个技巧，就是重换服务器用一个变量自增，然后发送时服务器的ID%服务器长度，就可以做到循环请求服务器。</p>
+</li>
+<li><p>PutAppend</p>
+</li>
+</ol>
+<h4 id="Server"><a href="#Server" class="headerlink" title="Server"></a>Server</h4><p>KVServer收到RPC后要进行处理，第一步收集必要信息，通过Start传送到Raft层同步，第二步等待同步结果并返回给客户端。也就是Leader的KVServer收到Client端的DB操作后，需要将操作封装成Command通过Raft的Start接口投递给Raft层进行同步，Raft层通过心跳的方式同步给其他Follower。</p>
+<p>等待结果部分：</p>
+<ol>
+<li>每个Client有一个Clerk结果，其中有两个关键字段MsgUniqueId和对应请求的Channel（getCh&#x2F;putAppendCh），处理RPC时先设置这个MsgUniqueId为Start后返回的LogIndex</li>
+<li>随后Read对应操作的Channel进行阻塞等待</li>
+<li>在处理Raft层返回的结果时（一个单独goroutine），检查ClerkMsgUniqueId是否与这个ApplyMsg的CommandIndex先庚并且当前节点是否为leader，是则表示需要通知。投递消息到Clerk的Channel，来响应客户端。</li>
+</ol>
+</li>
+</ol>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2023-07-10</span><i class="fa fa-tag"></i></div></div></div></div><div class="share"><div class="evernote"><a class="fa fa-bookmark" href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank"></a></div><div class="weibo"><a class="fa fa-weibo" href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));"></a></div><div class="twitter"><a class="fa fa-twitter" target="_blank" rel="noopener" href="http://twitter.com/home?status=,http://example.com/2023/07/10/devlog-raft-kv/,Minho hooooo.,开发日志 —— Raft-KV,;"></a></div></div><div class="pagination"><ul class="clearfix"><li class="next pagbuttons"><a class="btn" role="navigation" href="/2023/06/28/distributed-04-raft/" title="分布式共识算法 —— Raft">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script></body></html>
